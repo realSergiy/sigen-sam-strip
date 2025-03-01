@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import CreateFilmstripError from '@/graphql/errors/CreateFilmstripError';
-import DrawFrameError from '@/graphql/errors/DrawFrameError';
-import WebGLContextError from '@/graphql/errors/WebGLContextError';
+import CreateFilmstripError from '@/common/error/errors/CreateFilmstripError';
+import DrawFrameError from '@/common/error/errors/DrawFrameError';
+import WebGLContextError from '@/common/error/errors/WebGLContextError';
 import {errorConstructors} from 'serialize-error';
 
 export function registerSerializableConstructors() {

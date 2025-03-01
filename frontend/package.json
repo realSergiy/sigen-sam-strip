@@ -5,8 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "merge-schemas": "tsx schemas/merge-schemas",
-    "relay": "yarn merge-schemas && relay-compiler",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview --open"
@@ -16,7 +14,6 @@
     "@heroicons/react": "^2.0.18",
     "@monaco-editor/react": "^4.6.0",
     "@stylexjs/stylex": "^0.6.1",
-    "graphql": "^16.8.1",
     "immer": "^10.0.3",
     "immutability-helper": "^3.1.1",
     "jotai": "^2.6.1",
@@ -33,29 +30,22 @@
     "react-error-boundary": "^4.0.11",
     "react-photo-album": "^2.3.0",
     "react-pts-canvas": "^0.5.2",
-    "react-relay": "^16.2.0",
     "react-router-dom": "^6.15.0",
-    "relay-runtime": "^16.2.0",
     "serialize-error": "^11.0.3",
     "use-immer": "^0.9.0",
     "use-resize-observer": "^9.1.0"
   },
   "devDependencies": {
-    "@graphql-tools/load-files": "^7.0.0",
-    "@graphql-tools/merge": "^9.0.4",
     "@tailwindcss/typography": "^0.5.9",
     "@types/dom-webcodecs": "^0.1.11",
     "@types/invariant": "^2.2.37",
     "@types/node": "^20.14.10",
     "@types/react": "^18.2.47",
     "@types/react-dom": "^18.2.7",
-    "@types/react-relay": "^16.0.6",
-    "@types/relay-runtime": "^14.1.13",
     "@typescript-eslint/eslint-plugin": "^6.18.1",
     "@typescript-eslint/parser": "^6.18.1",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.15",
-    "babel-plugin-relay": "^16.2.0",
     "babel-plugin-strip-invariant": "^1.0.0",
     "daisyui": "^3.6.3",
     "eslint": "^8.48.0",
@@ -71,7 +61,6 @@
     "postcss": "^8.4.28",
     "postinstall-postinstall": "^2.1.0",
     "prettier": "^3.0.3",
-    "relay-compiler": "^16.2.0",
     "sass": "^1.66.1",
     "strip-ansi": "^7.1.0",
     "tailwindcss": "^3.3.3",
@@ -79,22 +68,10 @@
     "typescript": ">=4.3.5 <5.4.0",
     "vite": "^5.0.11",
     "vite-plugin-babel": "^1.2.0",
-    "vite-plugin-relay": "^2.0.0",
     "vite-plugin-stylex-dev": "^0.5.2"
   },
   "resolutions": {
     "wrap-ansi": "7.0.0"
-  },
-  "relay": {
-    "src": "./src/",
-    "schema": "./schema.graphql",
-    "language": "typescript",
-    "eagerEsModules": true,
-    "exclude": [
-      "**/node_modules/**",
-      "**/__mocks__/**",
-      "**/__generated__/**"
-    ]
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

@@ -15,14 +15,13 @@ from app_conf import (
     UPLOADS_PREFIX,
 )
 from data.loader import preload_data
-from data.schema import schema
 from data.store import set_videos
-from flask import Flask, make_response, Request, request, Response, send_from_directory
+from flask import Flask, make_response, request, Response, send_from_directory
 from flask_cors import CORS
 from inference.data_types import PropagateDataResponse, PropagateInVideoRequest
 from inference.multipart import MultipartResponseBuilder
 from inference.predictor import InferenceAPI
-from strawberry.flask.views import GraphQLView
+from rest_api import create_rest_api
 
 logger = logging.getLogger(__name__)
 
@@ -113,27 +112,8 @@ def gen_track_with_mask_stream(
             ).get_message()
 
 
-class MyGraphQLView(GraphQLView):
-    def get_context(self, request: Request, response: Response) -> Any:
-        return {"inference_api": inference_api}
-
-
-# Add GraphQL route to Flask app.
-app.add_url_rule(
-    "/graphql",
-    view_func=MyGraphQLView.as_view(
-        "graphql_view",
-        schema=schema,
-        # Disable GET queries
-        # https://strawberry.rocks/docs/operations/deployment
-        # https://strawberry.rocks/docs/integrations/flask
-        allow_queries_via_get=False,
-        # Strawberry recently changed multipart request handling, which now
-        # requires enabling support explicitly for views.
-        # https://github.com/strawberry-graphql/strawberry/issues/3655
-        multipart_uploads_enabled=True,
-    ),
-)
+# Register REST API routes
+app.register_blueprint(create_rest_api(inference_api))
 
 
 if __name__ == "__main__":

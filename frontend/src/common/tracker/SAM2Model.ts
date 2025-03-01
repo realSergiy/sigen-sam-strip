@@ -17,16 +17,6 @@ import {generateThumbnail} from '@/common/components/video/editor/VideoEditorUti
 import VideoWorkerContext from '@/common/components/video/VideoWorkerContext';
 import Logger from '@/common/logger/Logger';
 import {
-  SAM2ModelAddNewPointsMutation,
-  SAM2ModelAddNewPointsMutation$data,
-} from '@/common/tracker/__generated__/SAM2ModelAddNewPointsMutation.graphql';
-import {SAM2ModelCancelPropagateInVideoMutation} from '@/common/tracker/__generated__/SAM2ModelCancelPropagateInVideoMutation.graphql';
-import {SAM2ModelClearPointsInFrameMutation} from '@/common/tracker/__generated__/SAM2ModelClearPointsInFrameMutation.graphql';
-import {SAM2ModelClearPointsInVideoMutation} from '@/common/tracker/__generated__/SAM2ModelClearPointsInVideoMutation.graphql';
-import {SAM2ModelCloseSessionMutation} from '@/common/tracker/__generated__/SAM2ModelCloseSessionMutation.graphql';
-import {SAM2ModelRemoveObjectMutation} from '@/common/tracker/__generated__/SAM2ModelRemoveObjectMutation.graphql';
-import {SAM2ModelStartSessionMutation} from '@/common/tracker/__generated__/SAM2ModelStartSessionMutation.graphql';
-import {
   BaseTracklet,
   Mask,
   SegmentationPoint,
@@ -50,7 +40,6 @@ import {convertMaskToRGBA} from '@/common/utils/MaskUtils';
 import multipartStream from '@/common/utils/MultipartStream';
 import {Stats} from '@/debug/stats/Stats';
 import {INFERENCE_API_ENDPOINT} from '@/demo/DemoConfig';
-import {createEnvironment} from '@/graphql/RelayEnvironment';
 import {
   DataArray,
   Masks,
@@ -61,7 +50,6 @@ import {
 } from '@/jscocotools/mask';
 import {THEME_COLORS} from '@/theme/colors';
 import invariant from 'invariant';
-import {IEnvironment, commitMutation, graphql} from 'relay-runtime';
 
 type Options = Pick<TrackerOptions, 'inferenceEndpoint'>;
 
@@ -76,15 +64,34 @@ type StreamMasksResult = {
     objectId: number;
     rleMask: RLEObject;
   }>;
+  rle_mask_list?: Array<{
+    object_id: number;
+    rle_mask: {
+      counts: string;
+      size: number[];
+      order: string;
+    };
+  }>;
 };
 
 type StreamMasksAbortResult = {
   aborted: boolean;
 };
 
+type RLEMaskListResponse = {
+  frameIndex: number;
+  rle_mask_list: Array<{
+    object_id: number;
+    rle_mask: {
+      counts: string;
+      size: number[];
+      order: string;
+    };
+  }>;
+};
+
 export class SAM2Model extends Tracker {
   private _endpoint: string;
-  private _environment: IEnvironment;
 
   private abortController: AbortController | null = null;
   private _session: Session = {
@@ -108,7 +115,6 @@ export class SAM2Model extends Tracker {
   ) {
     super(context);
     this._endpoint = options.inferenceEndpoint;
-    this._environment = createEnvironment(options.inferenceEndpoint);
 
     this._maskCanvas = new OffscreenCanvas(0, 0);
     const maskCtx = this._maskCanvas.getContext('2d');
@@ -116,97 +122,81 @@ export class SAM2Model extends Tracker {
     this._maskCtx = maskCtx;
   }
 
-  public startSession(videoPath: string): Promise<void> {
+  public async startSession(videoPath: string): Promise<void> {
     // Reset streaming state. Force update with the true flag to make sure the
     // UI updates its state.
     this._updateStreamingState('none', true);
 
-    return new Promise(resolve => {
-      try {
-        commitMutation<SAM2ModelStartSessionMutation>(this._environment, {
-          mutation: graphql`
-            mutation SAM2ModelStartSessionMutation($input: StartSessionInput!) {
-              startSession(input: $input) {
-                sessionId
-              }
-            }
-          `,
-          variables: {
-            input: {
-              path: videoPath,
-            },
-          },
-          onCompleted: response => {
-            const {sessionId} = response.startSession;
-            this._session.id = sessionId;
+    try {
+      const response = await fetch(`${this._endpoint}/api/start_session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          path: videoPath,
+        }),
+      });
 
-            this._sendResponse<SessionStartedResponse>('sessionStarted', {
-              sessionId,
-            });
-
-            // Clear any tracklets from the previous session when
-            // a new session is started
-            this._clearTracklets();
-
-            // Make an empty tracklet
-            this.createTracklet();
-            resolve();
-          },
-          onError: error => {
-            Logger.error(error);
-            this._sendResponse<SessionStartFailedResponse>(
-              'sessionStartFailed',
-            );
-            resolve();
-          },
-        });
-      } catch (error) {
-        Logger.error(error);
-        this._sendResponse<SessionStartFailedResponse>('sessionStartFailed');
-        resolve();
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-    });
+
+      const data = await response.json();
+      const sessionId = data.session_id;
+      this._session.id = sessionId;
+
+      this._sendResponse<SessionStartedResponse>('sessionStarted', {
+        sessionId,
+      });
+
+      // Clear any tracklets from the previous session when
+      // a new session is started
+      this._clearTracklets();
+
+      // Make an empty tracklet
+      this.createTracklet();
+    } catch (error) {
+      Logger.error(error);
+      this._sendResponse<SessionStartFailedResponse>('sessionStartFailed');
+    }
   }
 
-  public closeSession(): Promise<void> {
+  public async closeSession(): Promise<void> {
     const sessionId = this._session.id;
 
     // Do not call cleanup before retrieving the session id because cleanup
     // will reset the session id. If the order would be changed, it would
-    // never execute the closeSession mutation.
+    // never execute the closeSession request.
     this._cleanup();
 
     if (sessionId === null) {
       return Promise.resolve();
     }
-    return new Promise((resolve, reject) => {
-      commitMutation<SAM2ModelCloseSessionMutation>(this._environment, {
-        mutation: graphql`
-          mutation SAM2ModelCloseSessionMutation($input: CloseSessionInput!) {
-            closeSession(input: $input) {
-              success
-            }
-          }
-        `,
-        variables: {
-          input: {
-            sessionId,
-          },
+
+    try {
+      const response = await fetch(`${this._endpoint}/api/close_session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        onCompleted: response => {
-          const {success} = response.closeSession;
-          if (success === false) {
-            reject(new Error('Failed to close session'));
-            return;
-          }
-          resolve();
-        },
-        onError: error => {
-          Logger.error(error);
-          reject(error);
-        },
+        body: JSON.stringify({
+          session_id: sessionId,
+        }),
       });
-    });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.success === false) {
+        throw new Error('Failed to close session');
+      }
+    } catch (error) {
+      Logger.error(error);
+      throw error;
+    }
   }
 
   public createTracklet(): void {
@@ -237,7 +227,7 @@ export class SAM2Model extends Tracker {
     });
   }
 
-  public deleteTracklet(trackletId: number): Promise<void> {
+  public async deleteTracklet(trackletId: number): Promise<void> {
     const sessionId = this._session.id;
     if (sessionId === null) {
       return Promise.reject('No active session');
@@ -250,52 +240,46 @@ export class SAM2Model extends Tracker {
       trackletId,
     );
 
-    return new Promise((resolve, reject) => {
-      commitMutation<SAM2ModelRemoveObjectMutation>(this._environment, {
-        mutation: graphql`
-          mutation SAM2ModelRemoveObjectMutation($input: RemoveObjectInput!) {
-            removeObject(input: $input) {
-              frameIndex
-              rleMaskList {
-                objectId
-                rleMask {
-                  counts
-                  size
-                }
-              }
-            }
-          }
-        `,
-        variables: {
-          input: {objectId: trackletId, sessionId},
+    try {
+      const response = await fetch(`${this._endpoint}/api/remove_object`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        onCompleted: response => {
-          const trackletUpdates = response.removeObject;
-          this._sendResponse<TrackletDeletedResponse>('trackletDeleted', {
-            isSuccessful: true,
-          });
-          for (const trackletUpdate of trackletUpdates) {
-            this._updateTrackletMasks(
-              trackletUpdate,
-              trackletUpdate.frameIndex === this._context.frameIndex,
-              false, // shouldGoToFrame
-            );
-          }
-          this._removeTrackletMasks(tracklet);
-          resolve();
-        },
-        onError: error => {
-          this._sendResponse<TrackletDeletedResponse>('trackletDeleted', {
-            isSuccessful: false,
-          });
-          Logger.error(error);
-          reject(error);
-        },
+        body: JSON.stringify({
+          session_id: sessionId,
+          object_id: trackletId,
+        }),
       });
-    });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const trackletUpdates = await response.json();
+      this._sendResponse<TrackletDeletedResponse>('trackletDeleted', {
+        isSuccessful: true,
+      });
+
+      for (const trackletUpdate of trackletUpdates) {
+        this._updateTrackletMasks(
+          trackletUpdate,
+          trackletUpdate.frameIndex === this._context.frameIndex,
+          false, // shouldGoToFrame
+        );
+      }
+
+      this._removeTrackletMasks(tracklet);
+    } catch (error) {
+      this._sendResponse<TrackletDeletedResponse>('trackletDeleted', {
+        isSuccessful: false,
+      });
+      Logger.error(error);
+      throw error;
+    }
   }
 
-  public updatePoints(
+  public async updatePoints(
     frameIndex: number,
     objectId: number,
     points: SegmentationPoint[],
@@ -335,52 +319,44 @@ export class SAM2Model extends Tracker {
     if (points.length === 0) {
       return this.clearPointsInFrame(frameIndex, objectId);
     }
-    return new Promise((resolve, reject) => {
+
+    try {
       const normalizedPoints = points.map(p => [
         p[0] / this._context.width,
         p[1] / this._context.height,
       ]);
       const labels = points.map(p => p[2]);
-      commitMutation<SAM2ModelAddNewPointsMutation>(this._environment, {
-        mutation: graphql`
-          mutation SAM2ModelAddNewPointsMutation($input: AddPointsInput!) {
-            addPoints(input: $input) {
-              frameIndex
-              rleMaskList {
-                objectId
-                rleMask {
-                  counts
-                  size
-                }
-              }
-            }
-          }
-        `,
-        variables: {
-          input: {
-            sessionId,
-            frameIndex,
-            objectId,
-            labels: labels,
-            points: normalizedPoints,
-            clearOldPoints: true,
-          },
+
+      const response = await fetch(`${this._endpoint}/api/add_points`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        onCompleted: response => {
-          tracklet.points[frameIndex] = points;
-          tracklet.isInitialized = true;
-          this._updateTrackletMasks(response.addPoints, true);
-          resolve();
-        },
-        onError: error => {
-          Logger.error(error);
-          reject(error);
-        },
+        body: JSON.stringify({
+          session_id: sessionId,
+          frame_index: frameIndex,
+          object_id: objectId,
+          labels: labels,
+          points: normalizedPoints,
+          clear_old_points: true,
+        }),
       });
-    });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      tracklet.points[frameIndex] = points;
+      tracklet.isInitialized = true;
+      this._updateTrackletMasks(data, true);
+    } catch (error) {
+      Logger.error(error);
+      throw error;
+    }
   }
 
-  public clearPointsInFrame(
+  public async clearPointsInFrame(
     frameIndex: number,
     objectId: number,
   ): Promise<void> {
@@ -399,46 +375,37 @@ export class SAM2Model extends Tracker {
     // Mark session needing propagation when point is set
     this._updateStreamingState('required');
 
-    return new Promise((resolve, reject) => {
-      commitMutation<SAM2ModelClearPointsInFrameMutation>(this._environment, {
-        mutation: graphql`
-          mutation SAM2ModelClearPointsInFrameMutation(
-            $input: ClearPointsInFrameInput!
-          ) {
-            clearPointsInFrame(input: $input) {
-              frameIndex
-              rleMaskList {
-                objectId
-                rleMask {
-                  counts
-                  size
-                }
-              }
-            }
-          }
-        `,
-        variables: {
-          input: {
-            sessionId,
-            frameIndex,
-            objectId,
+    try {
+      const response = await fetch(
+        `${this._endpoint}/api/clear_points_in_frame`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
           },
+          body: JSON.stringify({
+            session_id: sessionId,
+            frame_index: frameIndex,
+            object_id: objectId,
+          }),
         },
-        onCompleted: response => {
-          tracklet.points[frameIndex] = [];
-          tracklet.isInitialized = true;
-          this._updateTrackletMasks(response.clearPointsInFrame, true);
-          resolve();
-        },
-        onError: error => {
-          Logger.error(error);
-          reject(error);
-        },
-      });
-    });
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      tracklet.points[frameIndex] = [];
+      tracklet.isInitialized = true;
+      this._updateTrackletMasks(data, true);
+    } catch (error) {
+      Logger.error(error);
+      throw error;
+    }
   }
 
-  public clearPointsInVideo(): Promise<void> {
+  public async clearPointsInVideo(): Promise<void> {
     const sessionId = this._session.id;
     if (sessionId === null) {
       return Promise.reject('No active session');
@@ -447,51 +414,49 @@ export class SAM2Model extends Tracker {
     // Mark session needing propagation when point is set
     this._updateStreamingState('none');
 
-    return new Promise(resolve => {
-      commitMutation<SAM2ModelClearPointsInVideoMutation>(this._environment, {
-        mutation: graphql`
-          mutation SAM2ModelClearPointsInVideoMutation(
-            $input: ClearPointsInVideoInput!
-          ) {
-            clearPointsInVideo(input: $input) {
-              success
-            }
-          }
-        `,
-        variables: {
-          input: {
-            sessionId,
+    try {
+      const response = await fetch(
+        `${this._endpoint}/api/clear_points_in_video`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
           },
+          body: JSON.stringify({
+            session_id: sessionId,
+          }),
         },
-        onCompleted: response => {
-          const {success} = response.clearPointsInVideo;
-          if (!success) {
-            this._sendResponse<ClearPointsInVideoResponse>(
-              'clearPointsInVideo',
-              {isSuccessful: false},
-            );
-            return;
-          }
+      );
 
-          // Reset points and masks for each tracklet
-          this._clearTracklets();
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-          // Notify the main thread
-          this._context.goToFrame(this._context.frameIndex);
-          this._updateTracklets();
-          this._sendResponse<ClearPointsInVideoResponse>('clearPointsInVideo', {
-            isSuccessful: true,
-          });
-          resolve();
-        },
-        onError: error => {
-          this._sendResponse<ClearPointsInVideoResponse>('clearPointsInVideo', {
-            isSuccessful: false,
-          });
-          Logger.error(error);
-        },
+      const data = await response.json();
+      const {success} = data;
+
+      if (!success) {
+        this._sendResponse<ClearPointsInVideoResponse>('clearPointsInVideo', {
+          isSuccessful: false,
+        });
+        return;
+      }
+
+      // Reset points and masks for each tracklet
+      this._clearTracklets();
+
+      // Notify the main thread
+      this._context.goToFrame(this._context.frameIndex);
+      this._updateTracklets();
+      this._sendResponse<ClearPointsInVideoResponse>('clearPointsInVideo', {
+        isSuccessful: true,
       });
-    });
+    } catch (error) {
+      this._sendResponse<ClearPointsInVideoResponse>('clearPointsInVideo', {
+        isSuccessful: false,
+      });
+      Logger.error(error);
+    }
   }
 
   public async streamMasks(frameIndex: number): Promise<void> {
@@ -526,7 +491,19 @@ export class SAM2Model extends Tracker {
           this._updateStreamingState('aborted');
           isAborted = true;
         } else {
-          await this._updateTrackletMasks(result, false);
+          // Convert StreamMasksResult to RLEMaskListResponse format
+          const maskListResponse: RLEMaskListResponse = {
+            frameIndex: result.frameIndex,
+            rle_mask_list: result.rleMaskList.map(item => ({
+              object_id: item.objectId,
+              rle_mask: {
+                counts: item.rleMask.counts,
+                size: item.rleMask.size,
+                order: 'F',
+              },
+            })),
+          };
+          await this._updateTrackletMasks(maskListResponse, false);
           this._updateStreamingState('partial');
         }
       }
@@ -588,16 +565,16 @@ export class SAM2Model extends Tracker {
   }
 
   private async _updateTrackletMasks(
-    data: SAM2ModelAddNewPointsMutation$data['addPoints'],
+    data: RLEMaskListResponse,
     updateThumbnails: boolean,
     shouldGoToFrame: boolean = true,
   ) {
-    const {frameIndex, rleMaskList} = data;
+    const {frameIndex, rle_mask_list} = data;
 
     // 1. parse and decode masks for all objects
-    for (const {objectId, rleMask} of rleMaskList) {
-      const track = this._session.tracklets[objectId];
-      const {size, counts} = rleMask;
+    for (const {object_id, rle_mask} of rle_mask_list) {
+      const track = this._session.tracklets[object_id];
+      const {size, counts} = rle_mask;
       const rleObject: RLEObject = {
         size: [size[0], size[1]],
         counts: counts,
@@ -793,43 +770,34 @@ export class SAM2Model extends Tracker {
   private async _abortRequest(): Promise<void> {
     const sessionId = this._session.id;
     invariant(sessionId != null, 'session id cannot be empty');
-    return new Promise((resolve, reject) => {
-      try {
-        commitMutation<SAM2ModelCancelPropagateInVideoMutation>(
-          this._environment,
-          {
-            mutation: graphql`
-              mutation SAM2ModelCancelPropagateInVideoMutation(
-                $input: CancelPropagateInVideoInput!
-              ) {
-                cancelPropagateInVideo(input: $input) {
-                  success
-                }
-              }
-            `,
-            variables: {
-              input: {
-                sessionId,
-              },
-            },
-            onCompleted: response => {
-              const {success} = response.cancelPropagateInVideo;
-              if (!success) {
-                reject(`could not abort session ${sessionId}`);
-                return;
-              }
-              resolve();
-            },
-            onError: error => {
-              Logger.error(error);
-              reject(error);
-            },
+
+    try {
+      const response = await fetch(
+        `${this._endpoint}/api/cancel_propagate_in_video`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
           },
-        );
-      } catch (error) {
-        Logger.error(error);
-        reject(error);
+          body: JSON.stringify({
+            session_id: sessionId,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-    });
+
+      const data = await response.json();
+      const {success} = data;
+
+      if (!success) {
+        throw new Error(`could not abort session ${sessionId}`);
+      }
+    } catch (error) {
+      Logger.error(error);
+      throw error;
+    }
   }
 }
