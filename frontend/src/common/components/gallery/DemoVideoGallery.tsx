@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {DemoVideoGalleryQuery} from '@/common/components/gallery/__generated__/DemoVideoGalleryQuery.graphql';
 import VideoGalleryUploadVideo from '@/common/components/gallery/VideoGalleryUploadPhoto';
 import VideoPhoto from '@/common/components/gallery/VideoPhoto';
 import useScreenSize from '@/common/screen/useScreenSize';
@@ -21,9 +20,8 @@ import {VideoData} from '@/demo/atoms';
 import {DEMO_SHORT_NAME} from '@/demo/DemoConfig';
 import {fontSize, fontWeight, spacing} from '@/theme/tokens.stylex';
 import stylex from '@stylexjs/stylex';
-import {useMemo} from 'react';
+import {useEffect, useState} from 'react';
 import PhotoAlbum, {Photo, RenderPhotoProps} from 'react-photo-album';
-import {graphql, useLazyLoadQuery} from 'react-relay';
 import {useLocation, useNavigate} from 'react-router-dom';
 
 const styles = stylex.create({
@@ -77,47 +75,50 @@ export default function DemoVideoGallery({
   const navigate = useNavigate();
   const location = useLocation();
   const {isMobile: isMobileScreenSize} = useScreenSize();
+  const [videos, setVideos] = useState<VideoPhotoData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
-  const data = useLazyLoadQuery<DemoVideoGalleryQuery>(
-    graphql`
-      query DemoVideoGalleryQuery {
-        videos {
-          edges {
-            node {
-              id
-              path
-              posterPath
-              url
-              posterUrl
-              height
-              width
-              posterUrl
-            }
-          }
+  useEffect(() => {
+    const fetchVideos = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/videos');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
+        const data = await response.json();
+
+        const videoData = data.map((video: any) => {
+          return {
+            src: video.url,
+            path: video.path,
+            poster: video.posterPath,
+            posterPath: video.posterPath,
+            url: video.url,
+            posterUrl: video.posterUrl,
+            width: video.width,
+            height: video.height,
+            isUploadOption: false,
+          } as VideoPhotoData;
+        });
+
+        setVideos(videoData);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err : new Error('Unknown error occurred'),
+        );
+        console.error('Error fetching videos:', err);
+      } finally {
+        setLoading(false);
       }
-    `,
-    {},
-  );
+    };
 
-  const allVideos: VideoPhotoData[] = useMemo(() => {
-    return data.videos.edges.map(video => {
-      return {
-        src: video.node.url,
-        path: video.node.path,
-        poster: video.node.posterPath,
-        posterPath: video.node.posterPath,
-        url: video.node.url,
-        posterUrl: video.node.posterUrl,
-        width: video.node.width,
-        height: video.node.height,
-        isUploadOption: false,
-      } as VideoPhotoData;
-    });
-  }, [data.videos.edges]);
+    fetchVideos();
+  }, []);
 
-  const shareableVideos: VideoPhotoData[] = useMemo(() => {
-    const filteredVideos = [...allVideos];
+  const shareableVideos: VideoPhotoData[] = (() => {
+    const filteredVideos = [...videos];
 
     if (showUploadInGallery) {
       const uploadOption = {
@@ -131,7 +132,7 @@ export default function DemoVideoGallery({
     }
 
     return filteredVideos;
-  }, [allVideos, showUploadInGallery]);
+  })();
 
   const renderPhoto = ({
     photo: video,
@@ -175,6 +176,14 @@ export default function DemoVideoGallery({
 
   const descriptionStyle = 'text-sm md:text-base text-gray-400 leading-snug';
 
+  if (loading) {
+    return <div>Loading videos...</div>;
+  }
+
+  if (error) {
+    return <div>Error loading videos: {error.message}</div>;
+  }
+
   return (
     <div {...stylex.props(styles.container)}>
       <div {...stylex.props(styles.albumContainer)}>
@@ -187,7 +196,7 @@ export default function DemoVideoGallery({
               </span>
             </h3>
             <p className={descriptionStyle}>
-              You’ll be able to download what you make.
+              You'll be able to download what you make.
             </p>
           </div>
 

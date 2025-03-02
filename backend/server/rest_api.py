@@ -14,8 +14,8 @@ from flask import Blueprint, jsonify, request
 from inference.predictor import InferenceAPI
 from data.loader import get_video
 from data.transcoder import get_video_metadata, transcode, VideoMetadata
-from data.schema import get_file_hash, _get_start_sec_duration_sec
-from app_conf import DATA_PATH, UPLOADS_PATH, UPLOADS_PREFIX, MAX_UPLOAD_VIDEO_DURATION
+from app_conf import DATA_PATH, UPLOADS_PATH, UPLOADS_PREFIX, MAX_UPLOAD_VIDEO_DURATION, DEFAULT_VIDEO_PATH
+from data.store import get_videos
 from inference.data_types import (
     StartSessionRequest,
     CloseSessionRequest,
@@ -25,7 +25,6 @@ from inference.data_types import (
     RemoveObjectRequest,
     CancelPropagateInVideoRequest,
 )
-from app_conf import DATA_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +33,64 @@ rest_api = Blueprint('rest_api', __name__)
 
 def create_rest_api(inference_api: InferenceAPI):
     """Create REST API routes with the given inference API instance."""
+
+    @rest_api.route("/api/default_video", methods=["GET"])
+    def default_video():
+        """
+        Return the default video.
+
+        The default video can be set with the DEFAULT_VIDEO_PATH environment
+        variable. It will return the video that matches this path. If no video
+        is found, it will return the first video.
+        """
+        all_videos = get_videos()
+
+        # Find the video that matches the default path and return that as
+        # default video.
+        for _, v in all_videos.items():
+            if v.path == DEFAULT_VIDEO_PATH:
+                return jsonify({
+                    "id": v.code,
+                    "height": v.height,
+                    "width": v.width,
+                    "url": v.url(),
+                    "path": v.path,
+                    "posterPath": v.poster_path,
+                    "posterUrl": v.poster_url() if v.poster_path else None
+                })
+
+        # Fallback is returning the first video
+        first_video = next(iter(all_videos.values()))
+        return jsonify({
+            "id": first_video.code,
+            "height": first_video.height,
+            "width": first_video.width,
+            "url": first_video.url(),
+            "path": first_video.path,
+            "posterPath": first_video.poster_path,
+            "posterUrl": first_video.poster_url() if first_video.poster_path else None
+        })
+
+    @rest_api.route("/api/videos", methods=["GET"])
+    def videos():
+        """
+        Return all available videos.
+        """
+        all_videos = get_videos()
+        videos_list = []
+        
+        for _, v in all_videos.items():
+            videos_list.append({
+                "id": v.code,
+                "height": v.height,
+                "width": v.width,
+                "url": v.url(),
+                "path": v.path,
+                "posterPath": v.poster_path,
+                "posterUrl": v.poster_url() if v.poster_path else None
+            })
+            
+        return jsonify(videos_list)
 
     @rest_api.route("/api/start_session", methods=["POST"])
     def start_session():
@@ -273,6 +330,8 @@ def create_rest_api(inference_api: InferenceAPI):
             logger.error(f"Error processing video: {str(e)}")
             return jsonify({"error": str(e)}), 400
 
+    return rest_api
+
 def process_video(
     file,
     max_time: float,
@@ -339,8 +398,6 @@ def process_video(
         shutil.move(out_path, filepath)
 
         return filepath, file_key, out_video_metadata
-
-    return rest_api
 
 def _get_start_sec_duration_sec(
     start_time_sec: Union[float, None],

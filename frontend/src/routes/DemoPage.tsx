@@ -19,9 +19,7 @@ import useInputVideo from '@/common/components/video/useInputVideo';
 import StatsView from '@/debug/stats/StatsView';
 import {VideoData} from '@/demo/atoms';
 import DemoPageLayout from '@/layouts/DemoPageLayout';
-import {DemoPageQuery} from '@/routes/__generated__/DemoPageQuery.graphql';
-import {useEffect, useMemo} from 'react';
-import {graphql, useLazyLoadQuery} from 'react-relay';
+import {useEffect, useState, useMemo} from 'react';
 import {Location, useLocation} from 'react-router-dom';
 
 type LocationState = {
@@ -30,30 +28,55 @@ type LocationState = {
 
 export default function DemoPage() {
   const {state} = useLocation() as Location<LocationState>;
-  const data = useLazyLoadQuery<DemoPageQuery>(
-    graphql`
-      query DemoPageQuery {
-        defaultVideo {
-          path
-          posterPath
-          url
-          posterUrl
-          height
-          width
-        }
-      }
-    `,
-    {},
-  );
   const {setInputVideo} = useInputVideo();
-
-  const video = useMemo(() => {
-    return state?.video ?? data.defaultVideo;
-  }, [state, data]);
+  const [defaultVideo, setDefaultVideo] = useState<VideoData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    setInputVideo(video);
+    const fetchDefaultVideo = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/default_video');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        setDefaultVideo(data);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err : new Error('Unknown error occurred'),
+        );
+        console.error('Error fetching default video:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDefaultVideo();
+  }, []);
+
+  const video = useMemo(() => {
+    return state?.video ?? defaultVideo;
+  }, [state, defaultVideo]);
+
+  useEffect(() => {
+    if (video) {
+      setInputVideo(video);
+    }
   }, [video, setInputVideo]);
+
+  if (loading) {
+    return <div>Loading default video...</div>;
+  }
+
+  if (error) {
+    return <div>Error loading default video: {error.message}</div>;
+  }
+
+  if (!video) {
+    return <div>No video available</div>;
+  }
 
   return (
     <DemoPageLayout>
