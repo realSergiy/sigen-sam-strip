@@ -18,6 +18,7 @@ import DemoVideoEditor from '@/common/components/video/editor/DemoVideoEditor';
 import useInputVideo from '@/common/components/video/useInputVideo';
 import StatsView from '@/debug/stats/StatsView';
 import {VideoData} from '@/demo/atoms';
+import {VIDEO_API_ENDPOINT} from '@/demo/DemoConfig';
 import DemoPageLayout from '@/layouts/DemoPageLayout';
 import {useEffect, useState, useMemo} from 'react';
 import {Location, useLocation} from 'react-router-dom';
@@ -37,7 +38,7 @@ export default function DemoPage() {
     const fetchDefaultVideo = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/default_video');
+        const response = await fetch(`${VIDEO_API_ENDPOINT}/api/default_video`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }

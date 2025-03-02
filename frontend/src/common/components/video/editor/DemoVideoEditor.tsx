@@ -166,9 +166,7 @@ export default function DemoVideoEditor({video: inputVideo}: Props) {
 
     video?.addEventListener('renderingError', onRenderingError);
 
-    video?.initializeTracker('SAM 2', {
-      inferenceEndpoint: settings.inferenceAPIEndpoint,
-    });
+    video?.initializeTracker('SAM 2');
 
     video?.startSession(inputVideo.path);
 
@@ -299,7 +297,7 @@ export default function DemoVideoEditor({video: inputVideo}: Props) {
           video={inputVideo}
           layers={layers}
           loading={session == null}>
-          <div className="bg-graydark-800 w-full">
+          <div className="w-full bg-graydark-800">
             <VideoFilmstripWithPlayback />
             <TrackletsAnnotation />
           </div>

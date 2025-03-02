@@ -89,10 +89,10 @@ self.addEventListener(
 
         // Tracker
         case 'initializeTracker': {
-          const {name, options} = event.data;
+          const {name} = event.data;
           const Tracker = TRACKER_MAPPING[name];
           // Update the endpoint for the streaming API
-          tracker = new Tracker(context, options);
+          tracker = new Tracker(context);
           if (statsEnabled) {
             tracker.enableStats();
           }

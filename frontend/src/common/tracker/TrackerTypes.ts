@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {SegmentationPoint} from '@/common/tracker/Tracker';
-import {TrackerOptions, Trackers} from '@/common/tracker/Trackers';
+import {Trackers} from '@/common/tracker/Trackers';
 import {
   AddPointsEvent,
   ClearPointsInVideoEvent,
@@ -43,7 +43,6 @@ export type InitializeTrackerRequest = Request<
   'initializeTracker',
   {
     name: keyof Trackers;
-    options: TrackerOptions;
   }
 >;
 export type StartSessionRequest = Request<

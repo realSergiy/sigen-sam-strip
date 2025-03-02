@@ -15,6 +15,7 @@
  */
 import Logger from '@/common/logger/Logger';
 import {VideoData} from '@/demo/atoms';
+import {VIDEO_API_ENDPOINT} from '@/demo/DemoConfig';
 import {useState} from 'react';
 import {FileRejection, FileWithPath, useDropzone} from 'react-dropzone';
 
@@ -87,7 +88,7 @@ export default function useUploadVideo({
         // formData.append('duration_time_sec', '10');
 
         // Send the request to the REST API
-        const response = await fetch('/api/upload_video', {
+        const response = await fetch(`${VIDEO_API_ENDPOINT}/api/upload_video`, {
           method: 'POST',
           body: formData,
         });

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {BaseTracklet, SegmentationPoint} from '@/common/tracker/Tracker';
-import {TrackerOptions, Trackers} from '@/common/tracker/Trackers';
+import {Trackers} from '@/common/tracker/Trackers';
 import {PauseFilled, PlayFilledAlt} from '@carbon/icons-react';
 import stylex, {StyleXStyles} from '@stylexjs/stylex';
 import {
@@ -114,7 +114,7 @@ export type VideoRef = {
   ): void;
   createFilmstrip(width: number, height: number): Promise<ImageBitmap>;
   // Tracker
-  initializeTracker(name: keyof Trackers, options?: TrackerOptions): void;
+  initializeTracker(name: keyof Trackers): void;
   startSession(videoUrl: string): Promise<string | null>;
   closeSession(): void;
   logAnnotations(): void;
@@ -226,8 +226,8 @@ export default forwardRef<VideoRef, Props>(function Video(
         return bridge.createFilmstrip(width, height);
       },
       // Tracker
-      initializeTracker(name: keyof Trackers, options: TrackerOptions): void {
-        bridge.initializeTracker(name, options);
+      initializeTracker(name: keyof Trackers): void {
+        bridge.initializeTracker(name);
       },
       startSession(videoUrl: string): Promise<string | null> {
         return bridge.startSession(videoUrl);

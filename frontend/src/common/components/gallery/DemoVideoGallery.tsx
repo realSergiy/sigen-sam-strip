@@ -17,7 +17,7 @@ import VideoGalleryUploadVideo from '@/common/components/gallery/VideoGalleryUpl
 import VideoPhoto from '@/common/components/gallery/VideoPhoto';
 import useScreenSize from '@/common/screen/useScreenSize';
 import {VideoData} from '@/demo/atoms';
-import {DEMO_SHORT_NAME} from '@/demo/DemoConfig';
+import {DEMO_SHORT_NAME, VIDEO_API_ENDPOINT} from '@/demo/DemoConfig';
 import {fontSize, fontWeight, spacing} from '@/theme/tokens.stylex';
 import stylex from '@stylexjs/stylex';
 import {useEffect, useState} from 'react';
@@ -83,7 +83,7 @@ export default function DemoVideoGallery({
     const fetchVideos = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/videos');
+        const response = await fetch(`${VIDEO_API_ENDPOINT}/api/videos`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }

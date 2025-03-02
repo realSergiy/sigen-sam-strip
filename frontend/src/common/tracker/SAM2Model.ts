@@ -24,7 +24,6 @@ import {
   Tracker,
   Tracklet,
 } from '@/common/tracker/Tracker';
-import {TrackerOptions} from '@/common/tracker/Trackers';
 import {
   ClearPointsInVideoResponse,
   SessionStartFailedResponse,
@@ -50,8 +49,6 @@ import {
 } from '@/jscocotools/mask';
 import {THEME_COLORS} from '@/theme/colors';
 import invariant from 'invariant';
-
-type Options = Pick<TrackerOptions, 'inferenceEndpoint'>;
 
 type Session = {
   id: string | null;
@@ -107,14 +104,9 @@ export class SAM2Model extends Tracker {
 
   private _stats?: Stats;
 
-  constructor(
-    context: VideoWorkerContext,
-    options: Options = {
-      inferenceEndpoint: INFERENCE_API_ENDPOINT,
-    },
-  ) {
+  constructor(context: VideoWorkerContext) {
     super(context);
-    this._endpoint = options.inferenceEndpoint;
+    this._endpoint = INFERENCE_API_ENDPOINT;
 
     this._maskCanvas = new OffscreenCanvas(0, 0);
     const maskCtx = this._maskCanvas.getContext('2d');

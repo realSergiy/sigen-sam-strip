@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 import VideoWorkerContext from '@/common/components/video/VideoWorkerContext';
-
-import {TrackerOptions} from '@/common/tracker/Trackers';
 import {TrackerResponse} from '@/common/tracker/TrackerTypes';
 import {RLEObject} from '@/jscocotools/mask';
 
@@ -76,7 +74,7 @@ export interface ITracker {
 
 export abstract class Tracker implements ITracker {
   protected _context: VideoWorkerContext;
-  constructor(context: VideoWorkerContext, _options?: TrackerOptions) {
+  constructor(context: VideoWorkerContext) {
     this._context = context;
   }
   abstract startSession(videoUrl: string): Promise<void>;

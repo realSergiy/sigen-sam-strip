@@ -42,7 +42,7 @@ import {
   TrackletDeletedResponse,
   UpdatePointsRequest,
 } from '@/common/tracker/TrackerTypes';
-import {TrackerOptions, Trackers} from '@/common/tracker/Trackers';
+import {Trackers} from '@/common/tracker/Trackers';
 import {MP4ArrayBuffer} from 'mp4box';
 import {deserializeError, type ErrorObject} from 'serialize-error';
 import {EventEmitter} from './EventEmitter';
@@ -327,10 +327,9 @@ export default class VideoWorkerBridge extends EventEmitter<VideoWorkerEventMap>
     this.sendRequest<EncodeVideoRequest>('encode');
   }
 
-  initializeTracker(name: keyof Trackers, options: TrackerOptions): void {
+  initializeTracker(name: keyof Trackers): void {
     this.sendRequest<InitializeTrackerRequest>('initializeTracker', {
       name,
-      options,
     });
   }
 
