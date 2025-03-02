@@ -13,12 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {useUploadVideoMutation} from '@/common/components/gallery/__generated__/useUploadVideoMutation.graphql';
 import Logger from '@/common/logger/Logger';
 import {VideoData} from '@/demo/atoms';
 import {useState} from 'react';
 import {FileRejection, FileWithPath, useDropzone} from 'react-dropzone';
-import {graphql, useMutation} from 'react-relay';
 
 const ACCEPT_VIDEOS = {
   'video/mp4': ['.mp4'],
@@ -41,27 +39,13 @@ export default function useUploadVideo({
   onUploadError,
 }: Props) {
   const [error, setError] = useState<string | null>(null);
-  const [commit, isMutationInFlight] = useMutation<useUploadVideoMutation>(
-    graphql`
-      mutation useUploadVideoMutation($file: Upload!) {
-        uploadVideo(file: $file) {
-          id
-          height
-          width
-          url
-          path
-          posterPath
-          posterUrl
-        }
-      }
-    `,
-  );
+  const [isUploading, setIsUploading] = useState<boolean>(false);
 
   const {getRootProps, getInputProps} = useDropzone({
     accept: ACCEPT_VIDEOS,
     multiple: false,
     maxFiles: 1,
-    onDrop: (
+    onDrop: async (
       acceptedFiles: FileWithPath[],
       fileRejections: FileRejection[],
     ) => {
@@ -91,21 +75,39 @@ export default function useUploadVideo({
 
       onUploadStart?.();
       const file = acceptedFiles[0];
+      setIsUploading(true);
 
-      commit({
-        variables: {
-          file,
-        },
-        uploadables: {
-          file,
-        },
-        onCompleted: response => onUpload(response.uploadVideo),
-        onError: error => {
-          Logger.error(error);
+      try {
+        // Create FormData to send the file
+        const formData = new FormData();
+        formData.append('file', file);
+
+        // Add optional parameters if needed
+        // formData.append('start_time_sec', '0');
+        // formData.append('duration_time_sec', '10');
+
+        // Send the request to the REST API
+        const response = await fetch('/api/upload_video', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Upload failed');
+        }
+
+        const data = await response.json();
+        onUpload(data);
+      } catch (error) {
+        Logger.error(error);
+        if (error instanceof Error) {
           onUploadError?.(error);
-          setError('Upload failed.');
-        },
-      });
+        }
+        setError('Upload failed.');
+      } finally {
+        setIsUploading(false);
+      }
     },
     onError: error => {
       Logger.error(error);
@@ -117,7 +119,7 @@ export default function useUploadVideo({
   return {
     getRootProps,
     getInputProps,
-    isUploading: isMutationInFlight,
+    isUploading,
     error,
     setError,
   };

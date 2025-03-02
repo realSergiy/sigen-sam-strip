@@ -12,7 +12,7 @@ from typing import Dict, Optional
 
 import imagesize
 from app_conf import GALLERY_PATH, POSTERS_PATH, POSTERS_PREFIX
-from data.data_types import Video
+from data.data_types_rest import Video
 from tqdm import tqdm
 
 
