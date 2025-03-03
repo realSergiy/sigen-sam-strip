@@ -40,7 +40,7 @@ from inference.data_types import (
 )
 from inference.predictor import InferenceAPI
 import logging
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, request
 from werkzeug.datastructures import FileStorage
 
 
@@ -160,7 +160,7 @@ def create_rest_api(inference_api: InferenceAPI):
         clear_old_points = data.get("clear_old_points", True)
         
         if not all([session_id, frame_index is not None, object_id is not None, points, labels]):
-            return jsonify({"error": "Missing required parameters"}), 400
+            return {"error": "Missing required parameters"}, 400
             
         request_obj = AddPointsRequest(
             type="add_points",
