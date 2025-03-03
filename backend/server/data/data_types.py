@@ -3,6 +3,7 @@ from typing import Iterable, List, Optional
 
 from app_conf import API_URL
 from data.resolver import resolve_videos
+from werkzeug.datastructures import FileStorage
 
 from pydantic import BaseModel
 
@@ -20,6 +21,22 @@ class Video(BaseModel):
 
     def poster_url(self) -> str:
         return f"{API_URL}/{self.poster_path}"
+
+class VideoResponse(BaseModel):
+    """Standard video response format"""
+    id: str
+    height: int
+    width: int
+    url: str
+    path: str
+    posterPath: Optional[str] = None
+    posterUrl: Optional[str] = None
+
+class UploadVideoInput(BaseModel):
+    """Request model for video upload endpoint"""
+    file: FileStorage
+    start_time_sec: Optional[float] = None
+    duration_time_sec: Optional[float] = None
 
 class RLEMask(BaseModel):
     """Core type for RLE mask."""

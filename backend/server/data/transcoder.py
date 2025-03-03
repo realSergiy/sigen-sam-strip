@@ -13,12 +13,9 @@ from typing import Optional
 
 import av
 from app_conf import FFMPEG_NUM_THREADS
-from dataclasses_json import dataclass_json
 
 TRANSCODE_VERSION = 1
 
-
-@dataclass_json
 @dataclass
 class VideoMetadata:
     duration_sec: Optional[float]

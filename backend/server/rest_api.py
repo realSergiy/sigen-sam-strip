@@ -32,6 +32,8 @@ from data.data_types import (
     RLEMaskListOnFrame,
     StartSession,
     StartSessionInput,
+    UploadVideoInput,
+    VideoResponse,
 )
 from data.loader import get_video
 from data.store import get_videos
@@ -102,51 +104,33 @@ def create_rest_api(inference_api: InferenceAPI):
         }
 
     @rest_api.route("/api/videos", methods=["GET"])
+    @validate()
     def videos():
         """
         Return all available videos.
         """
         all_videos = get_videos()
-        videos_list = []
-        
-        for _, v in all_videos.items():
-            videos_list.append({
-                "id": v.code,
-                "height": v.height,
-                "width": v.width,
-                "url": v.url(),
-                "path": v.path,
-                "posterPath": v.poster_path,
-                "posterUrl": v.poster_url() if v.poster_path else None
-            })
-            
-        return videos_list
+        return [
+            VideoResponse(
+                id=v.code,
+                height=v.height,
+                width=v.width,
+                url=v.url(),
+                path=v.path,
+                posterPath=v.poster_path,
+                posterUrl=v.poster_url() if v.poster_path else None
+            )
+            for v in all_videos.values()
+        ]
     
     @rest_api.route("/api/upload_video", methods=["POST"])
-    def upload_video():
-        if 'file' not in request.files:
-            return {"error": "No file part"}, 400
-            
-        file = request.files['file']
-        if file.filename == '':
-            return {"error": "No selected file"}, 400
-            
-        # Get optional parameters
-        start_time_sec = request.form.get('start_time_sec')
-        duration_time_sec = request.form.get('duration_time_sec')
-        
-        # Convert to float if provided
-        if start_time_sec is not None:
-            start_time_sec = float(start_time_sec)
-        if duration_time_sec is not None:
-            duration_time_sec = float(duration_time_sec)
-
-        max_time = MAX_UPLOAD_VIDEO_DURATION
+    @validate()
+    def upload_video(body: UploadVideoInput):
         filepath, file_key, vm = process_video(
-            file,
-            max_time=max_time,
-            start_time_sec=start_time_sec,
-            duration_time_sec=duration_time_sec,
+            body.file,
+            max_time=MAX_UPLOAD_VIDEO_DURATION,
+            start_time_sec=body.start_time_sec,
+            duration_time_sec=body.duration_time_sec,
         )
 
         video = get_video(
@@ -157,7 +141,15 @@ def create_rest_api(inference_api: InferenceAPI):
             height=vm.height,
             generate_poster=False,
         )
-        return video.to_dict()
+        return VideoResponse(
+            id=video.code,
+            height=video.height,
+            width=video.width,
+            url=video.url(),
+            path=video.path,
+            posterPath=video.poster_path,
+            posterUrl=video.poster_url() if video.poster_path else None
+        )
 
     @rest_api.route("/api/start_session", methods=["POST"])
     @validate()
