@@ -86,7 +86,7 @@ make build
 make download-models
 
 # Check for outdated dependencies
-make check-updates
+make outdated
 
 # Update all dependencies
 make update-deps
@@ -120,7 +120,7 @@ Options for the `MODEL_SIZE` argument are "tiny", "small", "base_plus" (default)
 - To fix separators in the Makefile:
 
   ```bash
-  sed -i 's/^    /\t/g' /home/srg/Documents/projects/prod/sam-strips/strip-dev/Makefile
+  sed -i 's/^    /\t/g' ./Makefile
   ```
 
 ---

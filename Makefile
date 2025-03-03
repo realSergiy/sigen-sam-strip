@@ -1,4 +1,8 @@
-.PHONY: dev test lint build install clean setup activate download-models
+.PHONY: setup activate install build dev lint test download-models pk-show pk-outdated pk-update
+
+# Tips:
+# missing separator.  Stop. Fix with ```sed -i 's/^    /\t/g' ./Makefile```
+# terminal tab completions work!
 
 SHELL := /bin/bash
 
@@ -33,6 +37,14 @@ activate:
 	@echo ""
 	@echo "This cannot be done automatically by make because make runs in a subshell."
 
+install:
+	@echo "Installing dependencies..."
+	@cd backend && uv pip install -e '.[webapi,dev]'
+
+build:
+	@echo "Building package..."
+	@cd backend && python setup.py bdist_wheel
+
 dev:
 	@echo "Running development server..."
 	@cd backend/server && . ../../.venv/bin/activate && PYTORCH_ENABLE_MPS_FALLBACK=1 \
@@ -40,10 +52,6 @@ dev:
 	    APP_URL=http://localhost:7263 \
 	    MODEL_SIZE=base_plus \
 	    gunicorn --worker-class gthread app:app --workers 1 --bind 0.0.0.0:7263
-
-install:
-	@echo "Installing dependencies..."
-	@cd backend && uv pip install -e '.[webapi,dev]'
 
 lint:
 	@echo "Running linter..."
@@ -54,19 +62,25 @@ test:
 	@echo "Running tests..."
 	@cd backend && python -m pytest
 
-build:
-	@echo "Building package..."
-	@cd backend && python setup.py bdist_wheel
-
 download-models:
 	@echo "Downloading SAM 2.1 model checkpoints..."
 	@chmod +x ./backend/download_ckpts.sh
 	@cd $(shell pwd) && ./backend/download_ckpts.sh
 
-check-updates:
+pk-show:
+ifndef PKG
+	@echo "Error: Package name not provided."
+	@echo "Usage: make show-pkg PKG=package_name"
+	@exit 1
+else
+	@echo "Package information for $(PKG):"
+	@cd backend && . ../.venv/bin/activate && uv pip show $(PKG) || echo "Package '$(PKG)' not found"
+endif
+
+pk-outdated:
 	@echo "Checking for outdated dependencies..."
 	@cd backend && uv pip list --outdated
 
-update-deps:
+pk-update:
 	@echo "Updating dependencies..."
 	@cd backend && uv pip compile --upgrade-all setup.py -o requirements.lock
