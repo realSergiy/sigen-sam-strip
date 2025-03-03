@@ -97,7 +97,7 @@ Options for the `MODEL_SIZE` argument are "tiny", "small", "base_plus" (default)
 > [!WARNING]
 > Running the backend service on MPS devices (Apple Silicon) can cause fatal crashes with the Gunicorn worker due to insufficient MPS memory. Try switching to CPU devices by setting the `SAM2_DEMO_FORCE_CPU_DEVICE=1` environment variable.
 
-## **Docker Tips**
+## **Tips**
 
 - To rebuild the Docker containers (useful if you've made changes to the Dockerfile or dependencies):
 
@@ -115,6 +115,12 @@ Options for the `MODEL_SIZE` argument are "tiny", "small", "base_plus" (default)
 
   ```bash
   docker compose down
+  ```
+
+- To fix separators in the Makefile:
+
+  ```bash
+  sed -i 's/^    /\t/g' /home/srg/Documents/projects/prod/sam-strips/strip-dev/Makefile
   ```
 
 ---
