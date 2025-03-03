@@ -61,14 +61,6 @@ type StreamMasksResult = {
     objectId: number;
     rleMask: RLEObject;
   }>;
-  rle_mask_list?: Array<{
-    object_id: number;
-    rle_mask: {
-      counts: string;
-      size: number[];
-      order: string;
-    };
-  }>;
 };
 
 type StreamMasksAbortResult = {
@@ -77,9 +69,9 @@ type StreamMasksAbortResult = {
 
 type RLEMaskListResponse = {
   frameIndex: number;
-  rle_mask_list: Array<{
-    object_id: number;
-    rle_mask: {
+  rleMaskList: Array<{
+    objectId: number;
+    rleMask: {
       counts: string;
       size: number[];
       order: string;
@@ -135,7 +127,7 @@ export class SAM2Model extends Tracker {
       }
 
       const data = await response.json();
-      const sessionId = data.session_id;
+      const sessionId = data.sessionId_id;
       this._session.id = sessionId;
 
       this._sendResponse<SessionStartedResponse>('sessionStarted', {
@@ -487,9 +479,9 @@ export class SAM2Model extends Tracker {
           // Convert StreamMasksResult to RLEMaskListResponse format
           const maskListResponse: RLEMaskListResponse = {
             frameIndex: result.frameIndex,
-            rle_mask_list: result.rleMaskList.map(item => ({
-              object_id: item.objectId,
-              rle_mask: {
+            rleMaskList: result.rleMaskList.map(item => ({
+              objectId: item.objectId,
+              rleMask: {
                 counts: item.rleMask.counts,
                 size: item.rleMask.size,
                 order: 'F',
@@ -562,10 +554,10 @@ export class SAM2Model extends Tracker {
     updateThumbnails: boolean,
     shouldGoToFrame: boolean = true,
   ) {
-    const {frameIndex, rle_mask_list} = data;
+    const {frameIndex, rleMaskList: rle_mask_list} = data;
 
     // 1. parse and decode masks for all objects
-    for (const {object_id, rle_mask} of rle_mask_list) {
+    for (const {objectId: object_id, rleMask: rle_mask} of rle_mask_list) {
       const track = this._session.tracklets[object_id];
       const {size, counts} = rle_mask;
       const rleObject: RLEObject = {
