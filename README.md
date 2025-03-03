@@ -1,28 +1,22 @@
-# SAM 2 Demo
+# SIGEN GALLERY BACKEND
 
-Welcome to the SAM 2 Demo! This project consists of a frontend built with React TypeScript and Vite and a backend service using Python Flask and Strawberry GraphQL. Both components can be run in Docker containers or locally on MPS (Metal Performance Shaders) or CPU. However, running the backend service on MPS or CPU devices may result in significantly slower performance (FPS).
+Welcome to the sigen-gallery-backend! This is backend service using Python Flask. Can be run in Docker containers or locally on MPS (Apple Silicon Metal Performance Shaders) or CPU. However, running the backend service on MPS or CPU devices may result in significantly slower performance (FPS).
 
-## Prerequisites
+## **Prerequisites**
 
 Before you begin, ensure you have the following installed on your system:
 
-- Docker and Docker Compose
+- Docker and Docker Compose (for containerized deployment)
+- Python 3.12+ (for local development)
 
-### Installing Docker
+### **Installing Docker**
 
 To install Docker, follow these steps:
 
 1. Go to the [Docker website](https://www.docker.com/get-started)
 2. Follow the installation instructions for your operating system.
 
-### [OPTIONAL] Installing UV
-
-To install UV, follow these steps:
-
-1. Go to the [UV website](https://docs.astral.sh/uv/getting-started/installation/).
-2. Follow the installation instructions for your operating system.
-
-## Quick Start
+## **Quick Start**
 
 To get backend running quickly using Docker, you can use the following command:
 
@@ -34,80 +28,76 @@ This will build and start the backend:
 
 - **Backend:** [http://localhost:7263/graphql](http://localhost:7263/graphql)
 
-### Setting Up Your Environment
+## **Running Locally**
 
-1. **Create environment**
+### 1. Install UV
 
-   Create a new environment for this project by running the following command:
+To install UV, follow these steps:
 
-   ```bash
-   uv venv .venv
-   ```
+- Go to the [UV website](https://docs.astral.sh/uv/getting-started/installation/).
+- Follow the installation instructions for your operating system.
 
-   This will create a new environment.
+### 2. Quick Setup
 
-2. **Activate the environment:**
-
-   ```bash
-   source .venv/bin/activate
-   ```
-
-3. **Install ffmpeg**
-
-   ```bash
-   sudo apt install ffmpeg libavutil-dev libavcodec-dev libavformat-dev libswscale-dev
-   ```
-
-4. **Install SAM 2 demo dependencies:**
-
-   Install project dependencies by running the following command in the SAM 2 checkout root directory:
-
-   ```bash
-   cd backend
-   uv pip install -e '.[webapi]'
-   ```
-
-5. **Configure VS Code to Recognize the Environment**
-
-   - Press `Ctrl+Shift+P` to open the command palette
-   - Search for "Python: Select Interpreter"
-   - Choose the interpreter from your `.venv` folder
-
-### Running the Backend Locally
-
-Download the SAM 2 checkpoints:
+Run the automated setup:
 
 ```bash
-(cd ./checkpoints && ./download_ckpts.sh)
+make setup
 ```
 
-Use the following command to start the backend with MPS support:
+This will:
+
+- Create a virtual environment if it doesn't exist
+- Install ffmpeg and required libraries if not already installed
+- Install all project dependencies
+- Prompt you to activate the environment
+
+### 3. Activate the environment
 
 ```bash
-cd backend/server/
+source .venv/bin/activate
 ```
 
+### 4. Configure VS Code to Recognize the Environment
+
+- Press `Ctrl+Shift+P` to open the command palette
+- Search for "Python: Select Interpreter"
+- Choose the interpreter from your `.venv` folder
+
+## **Using the Makefile**
+
 ```bash
-PYTORCH_ENABLE_MPS_FALLBACK=1 \
-APP_ROOT="$(pwd)/../../../" \
-APP_URL=http://localhost:7263 \
-MODEL_SIZE=base_plus \
-DATA_PATH="$(pwd)/../../data" \
-DEFAULT_VIDEO_PATH=gallery/05_default_juggle.mp4 \
-gunicorn \
-    --worker-class gthread app:app \
-    --workers 1 \
-    --threads 2 \
-    --bind 0.0.0.0:7263 \
-    --timeout 60
+# Install dependencies
+make install
+
+# Run development server locally
+make dev
+
+# Run tests
+make test
+
+# Format code with black and usort
+make lint
+
+# Build package
+make build
+
+# Download model checkpoints
+make download-models
+
+# Check for outdated dependencies
+make check-updates
+
+# Update all dependencies
+make update-deps
 ```
 
 Options for the `MODEL_SIZE` argument are "tiny", "small", "base_plus" (default), and "large".
 
 > [!WARNING]
-> Running the backend service on MPS devices can cause fatal crashes with the Gunicorn worker due to insufficient MPS memory. Try switching to CPU devices by setting the `SAM2_DEMO_FORCE_CPU_DEVICE=1` environment variable.
+> Running the backend service on MPS devices (Apple Silicon) can cause fatal crashes with the Gunicorn worker due to insufficient MPS memory. Try switching to CPU devices by setting the `SAM2_DEMO_FORCE_CPU_DEVICE=1` environment variable.
 
-## Docker Tips
+## **Docker Tips**
 
 - To rebuild the Docker containers (useful if you've made changes to the Dockerfile or dependencies):
 
@@ -118,9 +108,7 @@ Options for the `MODEL_SIZE` argument are "tiny", "small", "base_plus" (default)
 - Or run once in a **watch** mode:
 
   ```bash
-
   docker compose up -w
-
   ```
 
 - To stop the Docker containers:
@@ -129,14 +117,6 @@ Options for the `MODEL_SIZE` argument are "tiny", "small", "base_plus" (default)
   docker compose down
   ```
 
-## Contributing
-
-Contributions are welcome! Please read our contributing guidelines to get started.
-
-## License
-
-See the LICENSE file for details.
-
 ---
 
-By following these instructions, you should have a fully functional development environment for both the frontend and backend of the SAM 2 Demo. Happy coding!
+By following these instructions, you should have a fully functional development environment for the sigen-gallery-backend. Happy coding!
