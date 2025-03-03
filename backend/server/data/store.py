@@ -5,7 +5,7 @@
 
 from typing import Dict
 
-from data.data_types_rest import Video
+from data.data_types import Video
 
 ALL_VIDEOS: Dict[str, Video] = []
 
