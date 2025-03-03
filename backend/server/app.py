@@ -15,13 +15,13 @@ from app_conf import (
     UPLOADS_PREFIX,
 )
 from data.loader import preload_data
+from data.schema import create_rest_api
 from data.store import set_videos
 from flask import Flask, make_response, request, Response, send_from_directory
 from flask_cors import CORS
 from inference.data_types import PropagateDataResponse, PropagateInVideoRequest
 from inference.multipart import MultipartResponseBuilder
 from inference.predictor import InferenceAPI
-from data.schema import create_rest_api
 
 logger = logging.getLogger(__name__)
 
