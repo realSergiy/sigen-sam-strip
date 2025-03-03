@@ -38,7 +38,8 @@ EXTRA_PACKAGES = {
         "opencv-python>=4.7.0",
         "eva-decord>=0.6.1",
     ],
-    "interactive-demo": [
+    "webapi": [
+        "pydantic>=2.10.0",
         "Flask>=3.0.3",
         "Flask-Cors>=5.0.0",
         "av>=13.0.0",
