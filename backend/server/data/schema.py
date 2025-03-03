@@ -4,65 +4,48 @@
 # LICENSE file in the root directory of this source tree.
 
 import hashlib
-import logging
 import os
-import tempfile
 import shutil
+import tempfile
 from typing import Optional, Tuple, Union
 
-from flask import Blueprint, jsonify, request
-from inference.predictor import InferenceAPI
-from data.loader import get_video
-from data.transcoder import get_video_metadata, transcode, VideoMetadata
-from app_conf import DATA_PATH, UPLOADS_PATH, UPLOADS_PREFIX, MAX_UPLOAD_VIDEO_DURATION, DEFAULT_VIDEO_PATH
-from data.store import get_videos
-from inference.data_types import (
-    StartSessionRequest,
-    CloseSessionRequest,
-    AddPointsRequest,
-    ClearPointsInFrameRequest,
-    ClearPointsInVideoRequest,
-    RemoveObjectRequest,
-    CancelPropagateInVideoRequest,
+import av
+from app_conf import (
+    DATA_PATH,
+    DEFAULT_VIDEO_PATH,
+    MAX_UPLOAD_VIDEO_DURATION,
+    UPLOADS_PATH,
+    UPLOADS_PREFIX,
 )
-
-from werkzeug.datastructures import FileStorage
-
 from data.data_types import (
-    AddPointsInput,
     CancelPropagateInVideo,
-    CancelPropagateInVideoInput,
-    ClearPointsInFrameInput,
     ClearPointsInVideo,
-    ClearPointsInVideoInput,
     CloseSession,
-    CloseSessionInput,
-    RemoveObjectInput,
     RLEMask,
     RLEMaskForObject,
     RLEMaskListOnFrame,
     StartSession,
-    StartSessionInput,
-    Video,
 )
+from data.loader import get_video
+from data.store import get_videos
+from data.transcoder import get_video_metadata, transcode, VideoMetadata
+from inference.data_types import (
+    AddPointsRequest,
+    CancelPropagateInVideoRequest,
+    ClearPointsInFrameRequest,
+    ClearPointsInVideoRequest,
+    CloseSessionRequest,
+    RemoveObjectRequest,
+    StartSessionRequest,
+)
+from inference.predictor import InferenceAPI
+import logging
+from flask import Blueprint, jsonify, request
+from werkzeug.datastructures import FileStorage
 
-from data.schema import (
-    dpr_default_video,
-    dpr_videos,
-    dpr_upload_video,
-    inf_start_session,
-    inf_close_session,
-    inf_add_points,
-    inf_remove_object,
-    inf_clear_points_in_frame,
-    inf_clear_points_in_video,
-    inf_cancel_propagate_in_video
-)
 
 logger = logging.getLogger(__name__)
-
 rest_api = Blueprint('rest_api', __name__)
-
 
 def create_rest_api(inference_api: InferenceAPI):
     """Create REST API routes with the given inference API instance."""
@@ -82,28 +65,27 @@ def create_rest_api(inference_api: InferenceAPI):
         # default video.
         for _, v in all_videos.items():
             if v.path == DEFAULT_VIDEO_PATH:
-                return jsonify(v)
+                return v
 
         # Fallback is returning the first video
-        return jsonify(next(iter(all_videos.values())))
-        
+        return next(iter(all_videos.values()))
 
     @rest_api.route("/api/videos", methods=["GET"])
     def videos():
         """
         Return all available videos.
         """
-        all_videos = get_videos().values()
-        return jsonify(all_videos)
+        all_videos = get_videos()
+        return all_videos.values()
 
     @rest_api.route("/api/upload_video", methods=["POST"])
     def upload_video():
         if 'file' not in request.files:
-            return jsonify({"error": "No file part"}), 400
+            return {"error": "No file part"}, 400
             
         file = request.files['file']
         if file.filename == '':
-            return jsonify({"error": "No selected file"}), 400
+            return {"error": "No selected file"}, 400
             
         # Get optional parameters
         start_time_sec = request.form.get('start_time_sec')
@@ -131,26 +113,24 @@ def create_rest_api(inference_api: InferenceAPI):
             height=vm.height,
             generate_poster=False,
         )
-
-        return jsonify(video)
-
+        return video
 
     @rest_api.route("/api/start_session", methods=["POST"])
     def start_session():
         data = request.json
         path = data.get("path")
-        
+
         if not path:
-            return jsonify({"error": "Path is required"}), 400
-            
+            return {"error": "Path is required"}, 400
+
         request_obj = StartSessionRequest(
             type="start_session",
             path=f"{DATA_PATH}/{path}",
         )
-        
+
         response = inference_api.start_session(request=request_obj)
-        
-        return jsonify(StartSession(session_id=response.session_id))
+
+        return StartSession(session_id=response.session_id)
 
     @rest_api.route("/api/close_session", methods=["POST"])
     def close_session():
@@ -158,7 +138,7 @@ def create_rest_api(inference_api: InferenceAPI):
         session_id = data.get("session_id")
         
         if not session_id:
-            return jsonify({"error": "Session ID is required"}), 400
+            return {"error": "Session ID is required"}, 400
             
         request_obj = CloseSessionRequest(
             type="close_session",
@@ -167,9 +147,7 @@ def create_rest_api(inference_api: InferenceAPI):
         
         response = inference_api.close_session(request=request_obj)
         
-        return jsonify({
-            "success": response.success
-        })
+        return CloseSession(success=response.success)
 
     @rest_api.route("/api/add_points", methods=["POST"])
     def add_points():
@@ -193,9 +171,8 @@ def create_rest_api(inference_api: InferenceAPI):
             labels=labels,
             clear_old_points=clear_old_points,
         )
-        
         response = inference_api.add_points(request=request_obj)
-        return jsonify(RLEMaskListOnFrame(
+        return RLEMaskListOnFrame(
             frame_index=response.frame_index,
             rle_mask_list=[
                 RLEMaskForObject(
@@ -204,7 +181,7 @@ def create_rest_api(inference_api: InferenceAPI):
                 )
                 for r in response.results
             ],
-        ))
+        )
 
     @rest_api.route("/api/remove_object", methods=["POST"])
     def remove_object():
@@ -213,7 +190,7 @@ def create_rest_api(inference_api: InferenceAPI):
         object_id = data.get("object_id")
         
         if not all([session_id, object_id is not None]):
-            return jsonify({"error": "Missing required parameters"}), 400
+            return {"error": "Missing required parameters"}, 400
             
         request_obj = RemoveObjectRequest(
             type="remove_object",
@@ -222,8 +199,8 @@ def create_rest_api(inference_api: InferenceAPI):
         )
         
         response = inference_api.remove_object(request=request_obj)
-        
-        return jsonify([
+
+        return [
             RLEMaskListOnFrame(
                 frame_index=res.frame_index,
                 rle_mask_list=[
@@ -237,7 +214,7 @@ def create_rest_api(inference_api: InferenceAPI):
                 ],
             )
             for res in response.results
-        ])
+        ]
 
     @rest_api.route("/api/clear_points_in_frame", methods=["POST"])
     def clear_points_in_frame():
@@ -247,7 +224,7 @@ def create_rest_api(inference_api: InferenceAPI):
         object_id = data.get("object_id")
         
         if not all([session_id, frame_index is not None, object_id is not None]):
-            return jsonify({"error": "Missing required parameters"}), 400
+            return {"error": "Missing required parameters"}, 400
             
         request_obj = ClearPointsInFrameRequest(
             type="clear_points_in_frame",
@@ -255,10 +232,10 @@ def create_rest_api(inference_api: InferenceAPI):
             frame_index=frame_index,
             object_id=object_id,
         )
-        
+
         response = inference_api.clear_points_in_frame(request=request_obj)
-        
-        return jsonify(RLEMaskListOnFrame(
+
+        return RLEMaskListOnFrame(
             frame_index=response.frame_index,
             rle_mask_list=[
                 RLEMaskForObject(
@@ -267,7 +244,7 @@ def create_rest_api(inference_api: InferenceAPI):
                 )
                 for r in response.results
             ],
-        ))
+        )
 
     @rest_api.route("/api/clear_points_in_video", methods=["POST"])
     def clear_points_in_video():
@@ -275,16 +252,14 @@ def create_rest_api(inference_api: InferenceAPI):
         session_id = data.get("session_id")
         
         if not session_id:
-            return jsonify({"error": "Session ID is required"}), 400
+            return {"error": "Session ID is required"}, 400
             
         request_obj = ClearPointsInVideoRequest(
             type="clear_points_in_video",
             session_id=session_id,
         )
-        
         response = inference_api.clear_points_in_video(request=request_obj)
-        
-        return jsonify(ClearPointsInVideo(success=response.success))
+        return ClearPointsInVideo(success=response.success)
 
     @rest_api.route("/api/cancel_propagate_in_video", methods=["POST"])
     def cancel_propagate_in_video():
@@ -292,17 +267,15 @@ def create_rest_api(inference_api: InferenceAPI):
         session_id = data.get("session_id")
         
         if not session_id:
-            return jsonify({"error": "Session ID is required"}), 400
+            return {"error": "Session ID is required"}, 400
             
         request_obj = CancelPropagateInVideoRequest(
             type="cancel_propagate_in_video",
             session_id=session_id,
         )
-        
         response = inference_api.cancel_propagate_in_video(request=request_obj)
-        
-        return jsonify(CancelPropagateInVideo(success=response.success))
-        
+        return CancelPropagateInVideo(success=response.success)
+
 
 def get_file_hash(video_path_or_file) -> str:
     if isinstance(video_path_or_file, str):
@@ -312,6 +285,7 @@ def get_file_hash(video_path_or_file) -> str:
         video_path_or_file.seek(0)
         result = hashlib.sha256(video_path_or_file.read()).hexdigest()
     return result
+
 
 def _get_start_sec_duration_sec(
     start_time_sec: Union[float, None],
@@ -328,12 +302,13 @@ def _get_start_sec_duration_sec(
         duration_time_sec = max_time
     return start_time_sec, duration_time_sec
 
+
 def process_video(
     file: FileStorage,
     max_time: float,
     start_time_sec: Optional[float] = None,
     duration_time_sec: Optional[float] = None,
-) -> Tuple[str, str, VideoMetadata]:
+) -> Tuple[Optional[str], str, str, VideoMetadata]:
     """
     Process file upload including video trimming and content moderation checks.
 
@@ -346,7 +321,7 @@ def process_video(
 
         try:
             video_metadata = get_video_metadata(in_path)
-        except Exception:
+        except av.InvalidDataError:
             raise Exception("not valid video file")
 
         if video_metadata.num_video_streams == 0:
