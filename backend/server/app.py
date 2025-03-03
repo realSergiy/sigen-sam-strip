@@ -21,7 +21,7 @@ from flask_cors import CORS
 from inference.data_types import PropagateDataResponse, PropagateInVideoRequest
 from inference.multipart import MultipartResponseBuilder
 from inference.predictor import InferenceAPI
-from rest_api import create_rest_api
+from data.schema import create_rest_api
 
 logger = logging.getLogger(__name__)
 

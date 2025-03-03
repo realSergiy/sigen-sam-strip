@@ -26,6 +26,39 @@ from inference.data_types import (
     CancelPropagateInVideoRequest,
 )
 
+from werkzeug.datastructures import FileStorage
+
+from data.data_types import (
+    AddPointsInput,
+    CancelPropagateInVideo,
+    CancelPropagateInVideoInput,
+    ClearPointsInFrameInput,
+    ClearPointsInVideo,
+    ClearPointsInVideoInput,
+    CloseSession,
+    CloseSessionInput,
+    RemoveObjectInput,
+    RLEMask,
+    RLEMaskForObject,
+    RLEMaskListOnFrame,
+    StartSession,
+    StartSessionInput,
+    Video,
+)
+
+from data.schema import (
+    dpr_default_video,
+    dpr_videos,
+    dpr_upload_video,
+    inf_start_session,
+    inf_close_session,
+    inf_add_points,
+    inf_remove_object,
+    inf_clear_points_in_frame,
+    inf_clear_points_in_video,
+    inf_cancel_propagate_in_video
+)
+
 logger = logging.getLogger(__name__)
 
 rest_api = Blueprint('rest_api', __name__)
@@ -49,48 +82,58 @@ def create_rest_api(inference_api: InferenceAPI):
         # default video.
         for _, v in all_videos.items():
             if v.path == DEFAULT_VIDEO_PATH:
-                return jsonify({
-                    "id": v.code,
-                    "height": v.height,
-                    "width": v.width,
-                    "url": v.url(),
-                    "path": v.path,
-                    "posterPath": v.poster_path,
-                    "posterUrl": v.poster_url() if v.poster_path else None
-                })
+                return jsonify(v)
 
         # Fallback is returning the first video
-        first_video = next(iter(all_videos.values()))
-        return jsonify({
-            "id": first_video.code,
-            "height": first_video.height,
-            "width": first_video.width,
-            "url": first_video.url(),
-            "path": first_video.path,
-            "posterPath": first_video.poster_path,
-            "posterUrl": first_video.poster_url() if first_video.poster_path else None
-        })
+        return jsonify(next(iter(all_videos.values())))
+        
 
     @rest_api.route("/api/videos", methods=["GET"])
     def videos():
         """
         Return all available videos.
         """
-        all_videos = get_videos()
-        videos_list = []
-        
-        for _, v in all_videos.items():
-            videos_list.append({
-                "id": v.code,
-                "height": v.height,
-                "width": v.width,
-                "url": v.url(),
-                "path": v.path,
-                "posterPath": v.poster_path,
-                "posterUrl": v.poster_url() if v.poster_path else None
-            })
+        all_videos = get_videos().values()
+        return jsonify(all_videos)
+
+    @rest_api.route("/api/upload_video", methods=["POST"])
+    def upload_video():
+        if 'file' not in request.files:
+            return jsonify({"error": "No file part"}), 400
             
-        return jsonify(videos_list)
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"error": "No selected file"}), 400
+            
+        # Get optional parameters
+        start_time_sec = request.form.get('start_time_sec')
+        duration_time_sec = request.form.get('duration_time_sec')
+        
+        # Convert to float if provided
+        if start_time_sec is not None:
+            start_time_sec = float(start_time_sec)
+        if duration_time_sec is not None:
+            duration_time_sec = float(duration_time_sec)
+
+        max_time = MAX_UPLOAD_VIDEO_DURATION
+        filepath, file_key, vm = process_video(
+            file,
+            max_time=max_time,
+            start_time_sec=start_time_sec,
+            duration_time_sec=duration_time_sec,
+        )
+
+        video = get_video(
+            filepath,
+            UPLOADS_PATH,
+            file_key=file_key,
+            width=vm.width,
+            height=vm.height,
+            generate_poster=False,
+        )
+
+        return jsonify(video)
+
 
     @rest_api.route("/api/start_session", methods=["POST"])
     def start_session():
@@ -107,9 +150,7 @@ def create_rest_api(inference_api: InferenceAPI):
         
         response = inference_api.start_session(request=request_obj)
         
-        return jsonify({
-            "session_id": response.session_id
-        })
+        return jsonify(StartSession(session_id=response.session_id))
 
     @rest_api.route("/api/close_session", methods=["POST"])
     def close_session():
@@ -154,21 +195,16 @@ def create_rest_api(inference_api: InferenceAPI):
         )
         
         response = inference_api.add_points(request=request_obj)
-        
-        return jsonify({
-            "frame_index": response.frame_index,
-            "rle_mask_list": [
-                {
-                    "object_id": r.object_id,
-                    "rle_mask": {
-                        "counts": r.mask.counts,
-                        "size": r.mask.size,
-                        "order": "F"
-                    }
-                }
+        return jsonify(RLEMaskListOnFrame(
+            frame_index=response.frame_index,
+            rle_mask_list=[
+                RLEMaskForObject(
+                    object_id=r.object_id,
+                    rle_mask=RLEMask(counts=r.mask.counts, size=r.mask.size, order="F"),
+                )
                 for r in response.results
-            ]
-        })
+            ],
+        ))
 
     @rest_api.route("/api/remove_object", methods=["POST"])
     def remove_object():
@@ -188,20 +224,18 @@ def create_rest_api(inference_api: InferenceAPI):
         response = inference_api.remove_object(request=request_obj)
         
         return jsonify([
-            {
-                "frame_index": res.frame_index,
-                "rle_mask_list": [
-                    {
-                        "object_id": r.object_id,
-                        "rle_mask": {
-                            "counts": r.mask.counts,
-                            "size": r.mask.size,
-                            "order": "F"
-                        }
-                    }
+            RLEMaskListOnFrame(
+                frame_index=res.frame_index,
+                rle_mask_list=[
+                    RLEMaskForObject(
+                        object_id=r.object_id,
+                        rle_mask=RLEMask(
+                            counts=r.mask.counts, size=r.mask.size, order="F"
+                        ),
+                    )
                     for r in res.results
-                ]
-            }
+                ],
+            )
             for res in response.results
         ])
 
@@ -224,20 +258,16 @@ def create_rest_api(inference_api: InferenceAPI):
         
         response = inference_api.clear_points_in_frame(request=request_obj)
         
-        return jsonify({
-            "frame_index": response.frame_index,
-            "rle_mask_list": [
-                {
-                    "object_id": r.object_id,
-                    "rle_mask": {
-                        "counts": r.mask.counts,
-                        "size": r.mask.size,
-                        "order": "F"
-                    }
-                }
+        return jsonify(RLEMaskListOnFrame(
+            frame_index=response.frame_index,
+            rle_mask_list=[
+                RLEMaskForObject(
+                    object_id=r.object_id,
+                    rle_mask=RLEMask(counts=r.mask.counts, size=r.mask.size, order="F"),
+                )
                 for r in response.results
-            ]
-        })
+            ],
+        ))
 
     @rest_api.route("/api/clear_points_in_video", methods=["POST"])
     def clear_points_in_video():
@@ -254,9 +284,7 @@ def create_rest_api(inference_api: InferenceAPI):
         
         response = inference_api.clear_points_in_video(request=request_obj)
         
-        return jsonify({
-            "success": response.success
-        })
+        return jsonify(ClearPointsInVideo(success=response.success))
 
     @rest_api.route("/api/cancel_propagate_in_video", methods=["POST"])
     def cancel_propagate_in_video():
@@ -273,67 +301,35 @@ def create_rest_api(inference_api: InferenceAPI):
         
         response = inference_api.cancel_propagate_in_video(request=request_obj)
         
-        return jsonify({
-            "success": response.success
-        })
+        return jsonify(CancelPropagateInVideo(success=response.success))
         
-    @rest_api.route("/api/upload_video", methods=["POST"])
-    def upload_video():
-        if 'file' not in request.files:
-            return jsonify({"error": "No file part"}), 400
-            
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({"error": "No selected file"}), 400
-            
-        # Get optional parameters
-        start_time_sec = request.form.get('start_time_sec')
-        duration_time_sec = request.form.get('duration_time_sec')
-        
-        # Convert to float if provided
-        if start_time_sec is not None:
-            start_time_sec = float(start_time_sec)
-        if duration_time_sec is not None:
-            duration_time_sec = float(duration_time_sec)
-            
-        try:
-            # Process the video
-            filepath, file_key, vm = process_video(
-                file,
-                max_time=MAX_UPLOAD_VIDEO_DURATION,
-                start_time_sec=start_time_sec,
-                duration_time_sec=duration_time_sec,
-            )
-            
-            # Get the video object
-            video = get_video(
-                filepath,
-                UPLOADS_PATH,
-                file_key=file_key,
-                width=vm.width,
-                height=vm.height,
-                generate_poster=False,
-            )
-            
-            # Return the video data
-            return jsonify({
-                "id": video.code,
-                "height": video.height,
-                "width": video.width,
-                "url": video.url(),
-                "path": video.path,
-                "posterPath": video.poster_path,
-                "posterUrl": video.poster_url() if video.poster_path else None
-            })
-            
-        except Exception as e:
-            logger.error(f"Error processing video: {str(e)}")
-            return jsonify({"error": str(e)}), 400
 
-    return rest_api
+def get_file_hash(video_path_or_file) -> str:
+    if isinstance(video_path_or_file, str):
+        with open(video_path_or_file, "rb") as in_f:
+            result = hashlib.sha256(in_f.read()).hexdigest()
+    else:
+        video_path_or_file.seek(0)
+        result = hashlib.sha256(video_path_or_file.read()).hexdigest()
+    return result
+
+def _get_start_sec_duration_sec(
+    start_time_sec: Union[float, None],
+    duration_time_sec: Union[float, None],
+    max_time: float,
+) -> Tuple[float, float]:
+    default_seek_t = int(os.environ.get("VIDEO_ENCODE_SEEK_TIME", "0"))
+    if start_time_sec is None:
+        start_time_sec = default_seek_t
+
+    if duration_time_sec is not None:
+        duration_time_sec = min(duration_time_sec, max_time)
+    else:
+        duration_time_sec = max_time
+    return start_time_sec, duration_time_sec
 
 def process_video(
-    file,
+    file: FileStorage,
     max_time: float,
     start_time_sec: Optional[float] = None,
     duration_time_sec: Optional[float] = None,
@@ -398,28 +394,3 @@ def process_video(
         shutil.move(out_path, filepath)
 
         return filepath, file_key, out_video_metadata
-
-def _get_start_sec_duration_sec(
-    start_time_sec: Union[float, None],
-    duration_time_sec: Union[float, None],
-    max_time: float,
-) -> Tuple[float, float]:
-    default_seek_t = int(os.environ.get("VIDEO_ENCODE_SEEK_TIME", "0"))
-    if start_time_sec is None:
-        start_time_sec = default_seek_t
-
-    if duration_time_sec is not None:
-        duration_time_sec = min(duration_time_sec, max_time)
-    else:
-        duration_time_sec = max_time
-    return start_time_sec, duration_time_sec
-
-
-def get_file_hash(video_path_or_file) -> str:
-    if isinstance(video_path_or_file, str):
-        with open(video_path_or_file, "rb") as in_f:
-            result = hashlib.sha256(in_f.read()).hexdigest()
-    else:
-        video_path_or_file.seek(0)
-        result = hashlib.sha256(video_path_or_file.read()).hexdigest()
-    return result

@@ -1,65 +1,46 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-
 from dataclasses import dataclass
 from typing import Iterable, List, Optional
 
-import strawberry
 from app_conf import API_URL
 from data.resolver import resolve_videos
-from dataclasses_json import dataclass_json
-from strawberry import relay
+from dataclasses_json import dataclass_json, LetterCase
 
-
-@strawberry.type
-class Video(relay.Node):
+@dataclass_json(letter_case=LetterCase.CAMEL)
+@dataclass
+class Video:
     """Core type for video."""
 
-    code: relay.NodeID[str]
+    code: str
     path: str
     poster_path: Optional[str]
     width: int
     height: int
 
-    @strawberry.field
     def url(self) -> str:
         return f"{API_URL}/{self.path}"
 
-    @strawberry.field
     def poster_url(self) -> str:
         return f"{API_URL}/{self.poster_path}"
 
-    @classmethod
-    def resolve_nodes(
-        cls,
-        *,
-        info: relay.PageInfo,
-        node_ids: Iterable[str],
-        required: bool = False,
-    ):
-        return resolve_videos(node_ids, required)
-
-
-@strawberry.type
+@dataclass_json(letter_case=LetterCase.CAMEL)
+@dataclass
 class RLEMask:
-    """Core type for Onevision GraphQL RLE mask."""
+    """Core type for RLE mask."""
 
     size: List[int]
     counts: str
     order: str
 
-
-@strawberry.type
+@dataclass_json(letter_case=LetterCase.CAMEL)
+@dataclass
 class RLEMaskForObject:
     """Type for RLE mask associated with a specific object id."""
 
     object_id: int
     rle_mask: RLEMask
 
-
-@strawberry.type
+@dataclass_json(letter_case=LetterCase.CAMEL)
+@dataclass
 class RLEMaskListOnFrame:
     """Type for a list of object-associated RLE masks on a specific video frame."""
 
@@ -67,37 +48,40 @@ class RLEMaskListOnFrame:
     rle_mask_list: List[RLEMaskForObject]
 
 
-@strawberry.input
+# input
 class StartSessionInput:
     path: str
 
 
-@strawberry.type
+@dataclass_json(letter_case=LetterCase.CAMEL)
+@dataclass
 class StartSession:
     session_id: str
 
 
-@strawberry.input
+# input
 class PingInput:
     session_id: str
 
 
-@strawberry.type
+@dataclass_json(letter_case=LetterCase.CAMEL)
+@dataclass
 class Pong:
     success: bool
 
 
-@strawberry.input
+# input
 class CloseSessionInput:
     session_id: str
 
 
-@strawberry.type
+@dataclass_json(letter_case=LetterCase.CAMEL)
+@dataclass
 class CloseSession:
     success: bool
 
 
-@strawberry.input
+# input
 class AddPointsInput:
     session_id: str
     frame_index: int
@@ -107,46 +91,49 @@ class AddPointsInput:
     points: List[List[float]]
 
 
-@strawberry.input
+# input
 class ClearPointsInFrameInput:
     session_id: str
     frame_index: int
     object_id: int
 
 
-@strawberry.input
+# input
 class ClearPointsInVideoInput:
     session_id: str
 
 
-@strawberry.type
+@dataclass_json(letter_case=LetterCase.CAMEL)
+@dataclass
 class ClearPointsInVideo:
     success: bool
 
 
-@strawberry.input
+# input
 class RemoveObjectInput:
     session_id: str
     object_id: int
 
 
-@strawberry.input
+# input
 class PropagateInVideoInput:
     session_id: str
     start_frame_index: int
 
 
-@strawberry.input
+# input
 class CancelPropagateInVideoInput:
     session_id: str
 
 
-@strawberry.type
+@dataclass_json(letter_case=LetterCase.CAMEL)
+@dataclass
 class CancelPropagateInVideo:
     success: bool
 
 
-@strawberry.type
+@dataclass_json(letter_case=LetterCase.CAMEL)
+@dataclass
 class SessionExpiration:
     session_id: str
     expiration_time: int
