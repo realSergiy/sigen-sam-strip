@@ -38,6 +38,7 @@ from sam2.build_sam import build_sam2_video_predictor
 
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class InferenceAPI:
@@ -120,6 +121,7 @@ class InferenceAPI:
     def add_points(
         self, request: AddPointsRequest, test: str = ""
     ) -> PropagateDataResponse:
+        logger.info(f"add points request: {request}")
         with self.autocast_context(), self.inference_lock:
             session = self.__get_session(request.session_id)
             inference_state = session["state"]
@@ -147,10 +149,12 @@ class InferenceAPI:
                 object_ids=object_ids, masks=masks_binary
             )
 
-            return PropagateDataResponse(
+            response = PropagateDataResponse(
                 frame_index=frame_idx,
                 results=rle_mask_list,
             )
+            logger.info(f"add points response: {response}")
+            return response
 
     def add_mask(self, request: AddMaskRequest) -> PropagateDataResponse:
         """

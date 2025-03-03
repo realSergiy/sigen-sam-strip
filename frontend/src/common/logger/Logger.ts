@@ -42,6 +42,7 @@ export class ConsoleLogger implements Logger {
 
   constructor(options?: {level?: LogLevel}) {
     const {level} = options || {};
+    console.log('log level:', level);
 
     // eslint-disable-next-line no-console
     this.error = console.error.bind(console);

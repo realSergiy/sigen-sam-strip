@@ -4,7 +4,14 @@
 # LICENSE file in the root directory of this source tree.
 
 import logging
+import sys
 from typing import Any, Generator
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler(sys.stderr)]
+)
 
 from app_conf import (
     GALLERY_PATH,

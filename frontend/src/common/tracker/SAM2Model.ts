@@ -338,9 +338,10 @@ export class SAM2Model extends Tracker {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
       tracklet.points[frameIndex] = points;
       tracklet.isInitialized = true;
+      const data = await response.json();
+      Logger.info('updatePoints', data);
       this._updateTrackletMasks(data, true);
     } catch (error) {
       Logger.error(error);

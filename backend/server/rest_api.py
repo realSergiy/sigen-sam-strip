@@ -41,6 +41,9 @@ from inference.data_types import (
 from inference.predictor import InferenceAPI
 import logging
 from flask import Blueprint, jsonify, request
+
+# Ensure all loggers are at INFO level
+logging.getLogger('inference').setLevel(logging.INFO)
 from werkzeug.datastructures import FileStorage
 
 
