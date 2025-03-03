@@ -119,7 +119,7 @@ def gen_track_with_mask_stream(
             ).get_message()
 
 
-# Register REST API routes
+# Register inference routes
 app.register_blueprint(create_rest_api(inference_api))
 
 

@@ -18,13 +18,20 @@ from app_conf import (
     UPLOADS_PREFIX,
 )
 from data.data_types import (
+    AddPointsInput,
     CancelPropagateInVideo,
+    CancelPropagateInVideoInput,
+    ClearPointsInFrameInput,
     ClearPointsInVideo,
+    ClearPointsInVideoInput,
     CloseSession,
+    CloseSessionInput,
+    RemoveObjectInput,
     RLEMask,
     RLEMaskForObject,
     RLEMaskListOnFrame,
     StartSession,
+    StartSessionInput,
 )
 from data.loader import get_video
 from data.store import get_videos
@@ -45,6 +52,8 @@ from flask import Blueprint, request
 # Ensure all loggers are at INFO level
 logging.getLogger('inference').setLevel(logging.INFO)
 from werkzeug.datastructures import FileStorage
+
+from flask_pydantic import validate
 
 
 logger = logging.getLogger(__name__)
@@ -151,9 +160,9 @@ def create_rest_api(inference_api: InferenceAPI):
         return video.to_dict()
 
     @rest_api.route("/api/start_session", methods=["POST"])
-    def start_session():
-        data = request.json
-        path = data.get("path")
+    @validate()
+    def start_session(body: StartSessionInput):        
+        path = body.path
         
         if not path:
             return {"error": "Path is required"}, 400
@@ -163,20 +172,14 @@ def create_rest_api(inference_api: InferenceAPI):
             path=f"{DATA_PATH}/{path}",
         )
         
-        ssr = inference_api.start_session(request=request_obj)
-        response = StartSession(session_id=ssr.session_id).to_dict()
-
-        logger.info(f'Session started: {response}')
-        return response
-
-    @rest_api.route("/api/close_session", methods=["POST"])
-    def close_session():
-        data = request.json
-        session_id = data.get("session_id")
-        
-        if not session_id:
-            return {"error": "Session ID is required"}, 400
+        res = inference_api.start_session(request=request_obj)
+        return StartSession(session_id=res.session_id)
             
+    @rest_api.route("/api/close_session", methods=["POST"])
+    @validate()
+    def close_session(body: CloseSessionInput):
+        session_id = body.session_id
+        
         request_obj = CloseSessionRequest(
             type="close_session",
             session_id=session_id,
@@ -184,34 +187,25 @@ def create_rest_api(inference_api: InferenceAPI):
         
         response = inference_api.close_session(request=request_obj)
         
-        return CloseSession(success=response.success).to_dict()
+        return CloseSession(success=response.success)
 
     @rest_api.route("/api/add_points", methods=["POST"])
-    def add_points():
-        data = request.json
-        session_id = data.get("session_id")
-        frame_index = data.get("frame_index")
-        object_id = data.get("object_id")
-        points = data.get("points")
-        labels = data.get("labels")
-        clear_old_points = data.get("clear_old_points", True)
-
-        logger.info(f'add_points: {data}')
-
-        if not all([session_id, frame_index is not None, object_id is not None, points, labels]):
-            logger.error('Missing required parameters', extra={'data': data})
-            return {"error": "Missing required parameters"}, 400
-            
+    @validate()
+    def add_points(body: AddPointsInput):
+        logger.info(f'add_points: {body}')
+        
         request_obj = AddPointsRequest(
             type="add_points",
-            session_id=session_id,
-            frame_index=frame_index,
-            object_id=object_id,
-            points=points,
-            labels=labels,
-            clear_old_points=clear_old_points,
+            session_id=body.session_id,
+            frame_index=body.frame_index,
+            object_id=body.object_id,
+            points=body.points,
+            labels=body.labels,
+            clear_old_points=body.clear_old_points,
         )
+        
         response = inference_api.add_points(request=request_obj)
+        
         return RLEMaskListOnFrame(
             frame_index=response.frame_index,
             rle_mask_list=[
@@ -221,21 +215,15 @@ def create_rest_api(inference_api: InferenceAPI):
                 )
                 for r in response.results
             ],
-        ).to_dict()
+        )
 
     @rest_api.route("/api/remove_object", methods=["POST"])
-    def remove_object():
-        data = request.json
-        session_id = data.get("session_id")
-        object_id = data.get("object_id")
-        
-        if not all([session_id, object_id is not None]):
-            return {"error": "Missing required parameters"}, 400
-            
+    @validate()
+    def remove_object(body: RemoveObjectInput):
         request_obj = RemoveObjectRequest(
             type="remove_object",
-            session_id=session_id,
-            object_id=object_id,
+            session_id=body.session_id,
+            object_id=body.object_id,
         )
         
         response = inference_api.remove_object(request=request_obj)
@@ -252,25 +240,18 @@ def create_rest_api(inference_api: InferenceAPI):
                     )
                     for r in res.results
                 ],
-            ).to_dict()
+            )
             for res in response.results
         ]
 
     @rest_api.route("/api/clear_points_in_frame", methods=["POST"])
-    def clear_points_in_frame():
-        data = request.json
-        session_id = data.get("session_id")
-        frame_index = data.get("frame_index")
-        object_id = data.get("object_id")
-        
-        if not all([session_id, frame_index is not None, object_id is not None]):
-            return {"error": "Missing required parameters"}, 400
-            
+    @validate()
+    def clear_points_in_frame(body: ClearPointsInFrameInput):
         request_obj = ClearPointsInFrameRequest(
             type="clear_points_in_frame",
-            session_id=session_id,
-            frame_index=frame_index,
-            object_id=object_id,
+            session_id=body.session_id,
+            frame_index=body.frame_index,
+            object_id=body.object_id,
         )
 
         response = inference_api.clear_points_in_frame(request=request_obj)
@@ -284,38 +265,31 @@ def create_rest_api(inference_api: InferenceAPI):
                 )
                 for r in response.results
             ],
-        ).to_dict()
+        )
 
     @rest_api.route("/api/clear_points_in_video", methods=["POST"])
-    def clear_points_in_video():
-        data = request.json
-        session_id = data.get("session_id")
-        
-        if not session_id:
-            return {"error": "Session ID is required"}, 400
-            
+    @validate()
+    def clear_points_in_video(body: ClearPointsInVideoInput):
         request_obj = ClearPointsInVideoRequest(
             type="clear_points_in_video",
-            session_id=session_id,
+            session_id=body.session_id,
         )
+        
         response = inference_api.clear_points_in_video(request=request_obj)
-        return ClearPointsInVideo(success=response.success).to_dict()
+        
+        return ClearPointsInVideo(success=response.success)
 
     @rest_api.route("/api/cancel_propagate_in_video", methods=["POST"])
-    def cancel_propagate_in_video():
-        data = request.json
-        session_id = data.get("session_id")
-        
-        if not session_id:
-            return {"error": "Session ID is required"}, 400
-            
+    @validate()
+    def cancel_propagate_in_video(body: CancelPropagateInVideoInput):
         request_obj = CancelPropagateInVideoRequest(
             type="cancel_propagate_in_video",
-            session_id=session_id,
+            session_id=body.session_id,
         )
         
         response = inference_api.cancel_propagate_in_video(request=request_obj)
-        return CancelPropagateInVideo(success=response.success).to_dict()
+        
+        return CancelPropagateInVideo(success=response.success)
 
     return rest_api
 

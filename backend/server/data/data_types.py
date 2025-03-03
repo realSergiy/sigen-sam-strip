@@ -3,11 +3,10 @@ from typing import Iterable, List, Optional
 
 from app_conf import API_URL
 from data.resolver import resolve_videos
-from dataclasses_json import dataclass_json, LetterCase
 
-@dataclass_json(letter_case=LetterCase.CAMEL)
-@dataclass
-class Video:
+from pydantic import BaseModel
+
+class Video(BaseModel):
     """Core type for video."""
 
     code: str
@@ -22,67 +21,44 @@ class Video:
     def poster_url(self) -> str:
         return f"{API_URL}/{self.poster_path}"
 
-@dataclass_json(letter_case=LetterCase.CAMEL)
-@dataclass
-class RLEMask:
+class RLEMask(BaseModel):
     """Core type for RLE mask."""
 
     size: List[int]
     counts: str
     order: str
 
-@dataclass_json(letter_case=LetterCase.CAMEL)
-@dataclass
-class RLEMaskForObject:
+class RLEMaskForObject(BaseModel):
     """Type for RLE mask associated with a specific object id."""
 
     object_id: int
     rle_mask: RLEMask
 
-@dataclass_json(letter_case=LetterCase.CAMEL)
-@dataclass
-class RLEMaskListOnFrame:
+class RLEMaskListOnFrame(BaseModel):
     """Type for a list of object-associated RLE masks on a specific video frame."""
 
     frame_index: int
     rle_mask_list: List[RLEMaskForObject]
 
-
-# input
-class StartSessionInput:
+class StartSessionInput(BaseModel):
     path: str
 
-
-@dataclass_json(letter_case=LetterCase.CAMEL)
-@dataclass
-class StartSession:
+class StartSession(BaseModel):
     session_id: str
 
-
-# input
-class PingInput:
+class PingInput(BaseModel):
     session_id: str
 
-
-@dataclass_json(letter_case=LetterCase.CAMEL)
-@dataclass
-class Pong:
+class Pong(BaseModel):
     success: bool
 
-
-# input
-class CloseSessionInput:
+class CloseSessionInput(BaseModel):
     session_id: str
 
-
-@dataclass_json(letter_case=LetterCase.CAMEL)
-@dataclass
-class CloseSession:
+class CloseSession(BaseModel):
     success: bool
 
-
-# input
-class AddPointsInput:
+class AddPointsInput(BaseModel):
     session_id: str
     frame_index: int
     clear_old_points: bool
@@ -90,51 +66,32 @@ class AddPointsInput:
     labels: List[int]
     points: List[List[float]]
 
-
-# input
-class ClearPointsInFrameInput:
+class ClearPointsInFrameInput(BaseModel):
     session_id: str
     frame_index: int
     object_id: int
 
-
-# input
-class ClearPointsInVideoInput:
+class ClearPointsInVideoInput(BaseModel):
     session_id: str
 
-
-@dataclass_json(letter_case=LetterCase.CAMEL)
-@dataclass
-class ClearPointsInVideo:
+class ClearPointsInVideo(BaseModel):
     success: bool
 
-
-# input
-class RemoveObjectInput:
+class RemoveObjectInput(BaseModel):
     session_id: str
     object_id: int
 
-
-# input
-class PropagateInVideoInput:
+class PropagateInVideoInput(BaseModel):
     session_id: str
     start_frame_index: int
 
-
-# input
-class CancelPropagateInVideoInput:
+class CancelPropagateInVideoInput(BaseModel):
     session_id: str
 
-
-@dataclass_json(letter_case=LetterCase.CAMEL)
-@dataclass
-class CancelPropagateInVideo:
+class CancelPropagateInVideo(BaseModel):
     success: bool
 
-
-@dataclass_json(letter_case=LetterCase.CAMEL)
-@dataclass
-class SessionExpiration:
+class SessionExpiration(BaseModel):
     session_id: str
     expiration_time: int
     max_expiration_time: int

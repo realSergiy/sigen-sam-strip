@@ -39,16 +39,15 @@ EXTRA_PACKAGES = {
         "eva-decord>=0.6.1",
     ],
     "webapi": [
+        "Flask-Pydantic>=0.12.0",
         "pydantic>=2.10.0",
         "Flask>=3.0.3",
         "Flask-Cors>=5.0.0",
         "av>=13.0.0",
-        "dataclasses-json>=0.6.7",
         "eva-decord>=0.6.1",
         "gunicorn>=23.0.0",
         "imagesize>=1.4.1",
         "pycocotools>=2.0.8",
-        "strawberry-graphql>=0.243.0",
     ],
     "dev": [
         "black==24.2.0",
