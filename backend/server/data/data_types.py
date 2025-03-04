@@ -3,7 +3,7 @@ from typing import Iterable, List, Optional
 
 from app_conf import API_URL
 from data.resolver import resolve_videos
-from werkzeug.datastructures import FileStorage
+from flask_openapi3 import FileStorage
 
 from pydantic import BaseModel
 

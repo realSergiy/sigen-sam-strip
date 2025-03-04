@@ -39,6 +39,8 @@ EXTRA_PACKAGES = {
         "eva-decord>=0.6.1",
     ],
     "webapi": [
+        "flask-openapi3>=4.1.0",
+        "flask-openapi3-redoc>=2.4.0",
         "Flask-Pydantic>=0.12.0",
         "pydantic>=2.10.0",
         "Flask>=3.0.3",
