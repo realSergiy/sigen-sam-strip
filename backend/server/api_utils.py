@@ -4,9 +4,8 @@ import shutil
 import tempfile
 import av
 from werkzeug.datastructures import FileStorage
-from backend.server.app import _get_start_sec_duration_sec
-from backend.server.app_conf import UPLOADS_PATH, UPLOADS_PREFIX
-from backend.server.data.transcoder import VideoMetadata, get_video_metadata, transcode
+from app_conf import UPLOADS_PATH, UPLOADS_PREFIX
+from data.transcoder import VideoMetadata, get_video_metadata, transcode
 from typing import Optional, Tuple, Union
 
 

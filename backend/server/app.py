@@ -18,8 +18,8 @@ from app_conf import (
     UPLOADS_PATH,
     UPLOADS_PREFIX,
 )
-from backend.server.api_utils import gen_track_with_mask_stream, process_video
-from backend.server.inference.multipart import MultipartResponseBuilder
+from api_utils import process_video
+from inference.multipart import MultipartResponseBuilder
 from data.data_types import (
     AddPointsInput,
     CancelPropagateInVideo,
@@ -29,6 +29,7 @@ from data.data_types import (
     ClearPointsInVideoInput,
     CloseSession,
     CloseSessionInput,
+    PropagateInVideoInput,
     RemoveObjectInput,
     RLEMask,
     RLEMaskForObject,
@@ -209,11 +210,10 @@ def clear_points_in_video(body: ClearPointsInVideoInput):
 
 # TOOD: Protect route with ToS permission check
 @app.post("/propagate_in_video", summary="propagate mask in video", tags=[Tag(name="segmentation", description="video segmentation operations")])
-def propagate_in_video() -> Response:
-    data = request.json
+def propagate_in_video(body: PropagateInVideoInput) -> Response:    
     args = {
-        "session_id": data["session_id"],
-        "start_frame_index": data.get("start_frame_index", 0),
+        "session_id": body.sessionId,        
+        "start_frame_index": body.startFrameIndex
     }
 
     boundary = "frame"
