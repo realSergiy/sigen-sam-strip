@@ -129,8 +129,8 @@ def create_rest_api(inference_api: InferenceAPI):
         filepath, file_key, vm = process_video(
             body.file,
             max_time=MAX_UPLOAD_VIDEO_DURATION,
-            start_time_sec=body.start_time_sec,
-            duration_time_sec=body.duration_time_sec,
+            start_time_sec=body.startTimeSec,
+            duration_time_sec=body.durationTimeSec,
         )
 
         video = get_video(
@@ -165,12 +165,12 @@ def create_rest_api(inference_api: InferenceAPI):
         )
         
         res = inference_api.start_session(request=request_obj)
-        return StartSession(session_id=res.session_id)
+        return StartSession(sessionId=res.session_id)
             
     @rest_api.route("/api/close_session", methods=["POST"])
     @validate()
     def close_session(body: CloseSessionInput):
-        session_id = body.session_id
+        session_id = body.sessionId
         
         request_obj = CloseSessionRequest(
             type="close_session",
@@ -188,22 +188,22 @@ def create_rest_api(inference_api: InferenceAPI):
         
         request_obj = AddPointsRequest(
             type="add_points",
-            session_id=body.session_id,
-            frame_index=body.frame_index,
-            object_id=body.object_id,
+            session_id=body.sessionId,
+            frame_index=body.frameIndex,
+            object_id=body.objectId,
             points=body.points,
             labels=body.labels,
-            clear_old_points=body.clear_old_points,
+            clear_old_points=body.clearOldPoints,
         )
         
         response = inference_api.add_points(request=request_obj)
         
         return RLEMaskListOnFrame(
-            frame_index=response.frame_index,
-            rle_mask_list=[
+            frameIndex=response.frame_index,
+            rleMaskList=[
                 RLEMaskForObject(
-                    object_id=r.object_id,
-                    rle_mask=RLEMask(counts=r.mask.counts, size=r.mask.size, order="F"),
+                    objectId=r.object_id,
+                    rleMask=RLEMask(counts=r.mask.counts, size=r.mask.size, order="F"),
                 )
                 for r in response.results
             ],
@@ -214,19 +214,19 @@ def create_rest_api(inference_api: InferenceAPI):
     def remove_object(body: RemoveObjectInput):
         request_obj = RemoveObjectRequest(
             type="remove_object",
-            session_id=body.session_id,
-            object_id=body.object_id,
+            session_id=body.sessionId,
+            object_id=body.objectId,
         )
         
         response = inference_api.remove_object(request=request_obj)
 
         return [
             RLEMaskListOnFrame(
-                frame_index=res.frame_index,
-                rle_mask_list=[
+                frameIndex=res.frame_index,
+                rleMaskList=[
                     RLEMaskForObject(
-                        object_id=r.object_id,
-                        rle_mask=RLEMask(
+                        objectId=r.object_id,
+                        rleMask=RLEMask(
                             counts=r.mask.counts, size=r.mask.size, order="F"
                         ),
                     )
@@ -241,19 +241,19 @@ def create_rest_api(inference_api: InferenceAPI):
     def clear_points_in_frame(body: ClearPointsInFrameInput):
         request_obj = ClearPointsInFrameRequest(
             type="clear_points_in_frame",
-            session_id=body.session_id,
-            frame_index=body.frame_index,
-            object_id=body.object_id,
+            session_id=body.sessionId,
+            frame_index=body.frameIndex,
+            object_id=body.objectId,
         )
 
         response = inference_api.clear_points_in_frame(request=request_obj)
 
         return RLEMaskListOnFrame(
-            frame_index=response.frame_index,
-            rle_mask_list=[
+            frameIndex=response.frame_index,
+            rleMaskList=[
                 RLEMaskForObject(
-                    object_id=r.object_id,
-                    rle_mask=RLEMask(counts=r.mask.counts, size=r.mask.size, order="F"),
+                    objectId=r.object_id,
+                    rleMask=RLEMask(counts=r.mask.counts, size=r.mask.size, order="F"),
                 )
                 for r in response.results
             ],
@@ -264,7 +264,7 @@ def create_rest_api(inference_api: InferenceAPI):
     def clear_points_in_video(body: ClearPointsInVideoInput):
         request_obj = ClearPointsInVideoRequest(
             type="clear_points_in_video",
-            session_id=body.session_id,
+            session_id=body.sessionId,
         )
         
         response = inference_api.clear_points_in_video(request=request_obj)
@@ -276,7 +276,7 @@ def create_rest_api(inference_api: InferenceAPI):
     def cancel_propagate_in_video(body: CancelPropagateInVideoInput):
         request_obj = CancelPropagateInVideoRequest(
             type="cancel_propagate_in_video",
-            session_id=body.session_id,
+            session_id=body.sessionId,
         )
         
         response = inference_api.cancel_propagate_in_video(request=request_obj)

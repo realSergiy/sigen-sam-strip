@@ -35,8 +35,8 @@ class VideoResponse(BaseModel):
 class UploadVideoInput(BaseModel):
     """Request model for video upload endpoint"""
     file: FileStorage
-    start_time_sec: Optional[float] = None
-    duration_time_sec: Optional[float] = None
+    startTimeSec: Optional[float] = None
+    durationTimeSec: Optional[float] = None
 
 class RLEMask(BaseModel):
     """Core type for RLE mask."""
@@ -48,68 +48,68 @@ class RLEMask(BaseModel):
 class RLEMaskForObject(BaseModel):
     """Type for RLE mask associated with a specific object id."""
 
-    object_id: int
-    rle_mask: RLEMask
+    objectId: int
+    rleMask: RLEMask
 
 class RLEMaskListOnFrame(BaseModel):
     """Type for a list of object-associated RLE masks on a specific video frame."""
 
-    frame_index: int
-    rle_mask_list: List[RLEMaskForObject]
+    frameIndex: int
+    rleMaskList: List[RLEMaskForObject]
 
 class StartSessionInput(BaseModel):
     path: str
 
 class StartSession(BaseModel):
-    session_id: str
+    sessionId: str
 
 class PingInput(BaseModel):
-    session_id: str
+    sessionId: str
 
 class Pong(BaseModel):
     success: bool
 
 class CloseSessionInput(BaseModel):
-    session_id: str
+    sessionId: str
 
 class CloseSession(BaseModel):
     success: bool
 
 class AddPointsInput(BaseModel):
-    session_id: str
-    frame_index: int
-    clear_old_points: bool
-    object_id: int
+    sessionId: str
+    frameIndex: int
+    clearOldPoints: bool
+    objectId: int
     labels: List[int]
     points: List[List[float]]
 
 class ClearPointsInFrameInput(BaseModel):
-    session_id: str
-    frame_index: int
-    object_id: int
+    sessionId: str
+    frameIndex: int
+    objectId: int
 
 class ClearPointsInVideoInput(BaseModel):
-    session_id: str
+    sessionId: str
 
 class ClearPointsInVideo(BaseModel):
     success: bool
 
 class RemoveObjectInput(BaseModel):
-    session_id: str
-    object_id: int
+    sessionId: str
+    objectId: int
 
 class PropagateInVideoInput(BaseModel):
-    session_id: str
-    start_frame_index: int
+    sessionId: str
+    startFrameIndex: int
 
 class CancelPropagateInVideoInput(BaseModel):
-    session_id: str
+    sessionId: str
 
 class CancelPropagateInVideo(BaseModel):
     success: bool
 
 class SessionExpiration(BaseModel):
-    session_id: str
-    expiration_time: int
-    max_expiration_time: int
+    sessionId: str
+    expirationTime: int
+    maxExpirationTime: int
     ttl: int
