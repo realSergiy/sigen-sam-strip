@@ -6,24 +6,20 @@
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Union
 
-from dataclasses_json import dataclass_json
 from torch import Tensor
 
 
-@dataclass_json
 @dataclass
 class Mask:
     size: List[int]
     counts: str
 
 
-@dataclass_json
 @dataclass
 class BaseRequest:
     type: str
 
 
-@dataclass_json
 @dataclass
 class StartSessionRequest(BaseRequest):
     type: str
@@ -31,35 +27,30 @@ class StartSessionRequest(BaseRequest):
     session_id: Optional[str] = None
 
 
-@dataclass_json
 @dataclass
 class SaveSessionRequest(BaseRequest):
     type: str
     session_id: str
 
 
-@dataclass_json
 @dataclass
 class LoadSessionRequest(BaseRequest):
     type: str
     session_id: str
 
 
-@dataclass_json
 @dataclass
 class RenewSessionRequest(BaseRequest):
     type: str
     session_id: str
 
 
-@dataclass_json
 @dataclass
 class CloseSessionRequest(BaseRequest):
     type: str
     session_id: str
 
 
-@dataclass_json
 @dataclass
 class AddPointsRequest(BaseRequest):
     type: str
@@ -71,7 +62,6 @@ class AddPointsRequest(BaseRequest):
     points: List[List[float]]
 
 
-@dataclass_json
 @dataclass
 class AddMaskRequest(BaseRequest):
     type: str
@@ -81,7 +71,6 @@ class AddMaskRequest(BaseRequest):
     mask: Mask
 
 
-@dataclass_json
 @dataclass
 class ClearPointsInFrameRequest(BaseRequest):
     type: str
@@ -90,14 +79,12 @@ class ClearPointsInFrameRequest(BaseRequest):
     object_id: int
 
 
-@dataclass_json
 @dataclass
 class ClearPointsInVideoRequest(BaseRequest):
     type: str
     session_id: str
 
 
-@dataclass_json
 @dataclass
 class RemoveObjectRequest(BaseRequest):
     type: str
@@ -105,7 +92,6 @@ class RemoveObjectRequest(BaseRequest):
     object_id: int
 
 
-@dataclass_json
 @dataclass
 class PropagateInVideoRequest(BaseRequest):
     type: str
@@ -113,76 +99,64 @@ class PropagateInVideoRequest(BaseRequest):
     start_frame_index: int
 
 
-@dataclass_json
 @dataclass
 class CancelPropagateInVideoRequest(BaseRequest):
     type: str
     session_id: str
 
 
-@dataclass_json
 @dataclass
 class StartSessionResponse:
     session_id: str
 
 
-@dataclass_json
 @dataclass
 class SaveSessionResponse:
     session_id: str
 
 
-@dataclass_json
 @dataclass
 class LoadSessionResponse:
     session_id: str
 
 
-@dataclass_json
 @dataclass
 class RenewSessionResponse:
     session_id: str
 
 
-@dataclass_json
 @dataclass
 class CloseSessionResponse:
     success: bool
 
 
-@dataclass_json
 @dataclass
 class ClearPointsInVideoResponse:
     success: bool
 
 
-@dataclass_json
 @dataclass
 class PropagateDataValue:
     object_id: int
     mask: Mask
 
 
-@dataclass_json
 @dataclass
 class PropagateDataResponse:
     frame_index: int
     results: List[PropagateDataValue]
 
 
-@dataclass_json
 @dataclass
 class RemoveObjectResponse:
     results: List[PropagateDataResponse]
 
 
-@dataclass_json
 @dataclass
 class CancelPorpagateResponse:
     success: bool
 
 
-@dataclass_json
 @dataclass
 class InferenceSession:
     start_time: float

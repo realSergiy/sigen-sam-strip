@@ -7,11 +7,9 @@ import hashlib
 import os
 import shutil
 import tempfile
-from pathlib import Path
-from typing import Iterable, List, Optional, Tuple, Union
+from typing import Optional, Tuple, Union
 
 import av
-import strawberry
 from app_conf import (
     DATA_PATH,
     DEFAULT_VIDEO_PATH,
@@ -34,14 +32,14 @@ from data.data_types import (
     RLEMaskListOnFrame,
     StartSession,
     StartSessionInput,
-    Video,
+    UploadVideoInput,
+    VideoResponse,
 )
 from data.loader import get_video
 from data.store import get_videos
 from data.transcoder import get_video_metadata, transcode, VideoMetadata
 from inference.data_types import (
     AddPointsRequest,
-    CancelPropagateInVideoRequest,
     CancelPropagateInVideoRequest,
     ClearPointsInFrameRequest,
     ClearPointsInVideoRequest,
@@ -50,15 +48,26 @@ from inference.data_types import (
     StartSessionRequest,
 )
 from inference.predictor import InferenceAPI
-from strawberry import relay
-from strawberry.file_uploads import Upload
+import logging
+from flask import Blueprint, request
+
+# Ensure all loggers are at INFO level
+logging.getLogger('inference').setLevel(logging.INFO)
+from werkzeug.datastructures import FileStorage
+
+from flask_pydantic import validate
 
 
-@strawberry.type
-class Query:
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
-    @strawberry.field
-    def default_video(self) -> Video:
+rest_api = Blueprint('rest_api', __name__)
+
+def create_rest_api(inference_api: InferenceAPI):
+    """Create REST API routes with the given inference API instance."""
+
+    @rest_api.route("/api/default_video", methods=["GET"])
+    def default_video():
         """
         Return the default video.
 
@@ -72,41 +81,56 @@ class Query:
         # default video.
         for _, v in all_videos.items():
             if v.path == DEFAULT_VIDEO_PATH:
-                return v
+                return {
+                    "id": v.code,
+                    "height": v.height,
+                    "width": v.width,
+                    "url": v.url(),
+                    "path": v.path,
+                    "posterPath": v.poster_path,
+                    "posterUrl": v.poster_url() if v.poster_path else None
+                }
 
         # Fallback is returning the first video
-        return next(iter(all_videos.values()))
+        first_video = next(iter(all_videos.values()))
+        return {
+            "id": first_video.code,
+            "height": first_video.height,
+            "width": first_video.width,
+            "url": first_video.url(),
+            "path": first_video.path,
+            "posterPath": first_video.poster_path,
+            "posterUrl": first_video.poster_url() if first_video.poster_path else None
+        }
 
-    @relay.connection(relay.ListConnection[Video])
-    def videos(
-        self,
-    ) -> Iterable[Video]:
+    @rest_api.route("/api/videos", methods=["GET"])
+    @validate()
+    def videos():
         """
         Return all available videos.
         """
         all_videos = get_videos()
-        return all_videos.values()
-
-
-@strawberry.type
-class Mutation:
-
-    @strawberry.mutation
-    def upload_video(
-        self,
-        file: Upload,
-        start_time_sec: Optional[float] = None,
-        duration_time_sec: Optional[float] = None,
-    ) -> Video:
-        """
-        Receive a video file and store it in the configured S3 bucket.
-        """
-        max_time = MAX_UPLOAD_VIDEO_DURATION
+        return [
+            VideoResponse(
+                id=v.code,
+                height=v.height,
+                width=v.width,
+                url=v.url(),
+                path=v.path,
+                posterPath=v.poster_path,
+                posterUrl=v.poster_url() if v.poster_path else None
+            )
+            for v in all_videos.values()
+        ]
+    
+    @rest_api.route("/api/upload_video", methods=["POST"])
+    @validate()
+    def upload_video(body: UploadVideoInput):
         filepath, file_key, vm = process_video(
-            file,
-            max_time=max_time,
-            start_time_sec=start_time_sec,
-            duration_time_sec=duration_time_sec,
+            body.file,
+            max_time=MAX_UPLOAD_VIDEO_DURATION,
+            start_time_sec=body.startTimeSec,
+            duration_time_sec=body.durationTimeSec,
         )
 
         video = get_video(
@@ -117,83 +141,92 @@ class Mutation:
             height=vm.height,
             generate_poster=False,
         )
-        return video
+        return VideoResponse(
+            id=video.code,
+            height=video.height,
+            width=video.width,
+            url=video.url(),
+            path=video.path,
+            posterPath=video.poster_path,
+            posterUrl=video.poster_url() if video.poster_path else None
+        )
 
-    @strawberry.mutation
-    def start_session(
-        self, input: StartSessionInput, info: strawberry.Info
-    ) -> StartSession:
-        inference_api: InferenceAPI = info.context["inference_api"]
-
-        request = StartSessionRequest(
+    @rest_api.route("/api/start_session", methods=["POST"])
+    @validate()
+    def start_session(body: StartSessionInput):        
+        path = body.path
+        
+        if not path:
+            return {"error": "Path is required"}, 400
+            
+        request_obj = StartSessionRequest(
             type="start_session",
-            path=f"{DATA_PATH}/{input.path}",
+            path=f"{DATA_PATH}/{path}",
         )
-
-        response = inference_api.start_session(request=request)
-
-        return StartSession(session_id=response.session_id)
-
-    @strawberry.mutation
-    def close_session(
-        self, input: CloseSessionInput, info: strawberry.Info
-    ) -> CloseSession:
-        inference_api: InferenceAPI = info.context["inference_api"]
-
-        request = CloseSessionRequest(
+        
+        res = inference_api.start_session(request=request_obj)
+        return StartSession(sessionId=res.session_id)
+            
+    @rest_api.route("/api/close_session", methods=["POST"])
+    @validate()
+    def close_session(body: CloseSessionInput):
+        session_id = body.sessionId
+        
+        request_obj = CloseSessionRequest(
             type="close_session",
-            session_id=input.session_id,
+            session_id=session_id,
         )
-        response = inference_api.close_session(request)
+        
+        response = inference_api.close_session(request=request_obj)
+        
         return CloseSession(success=response.success)
 
-    @strawberry.mutation
-    def add_points(
-        self, input: AddPointsInput, info: strawberry.Info
-    ) -> RLEMaskListOnFrame:
-        inference_api: InferenceAPI = info.context["inference_api"]
-
-        request = AddPointsRequest(
+    @rest_api.route("/api/add_points", methods=["POST"])
+    @validate()
+    def add_points(body: AddPointsInput):
+        logger.info(f'add_points: {body}')
+        
+        request_obj = AddPointsRequest(
             type="add_points",
-            session_id=input.session_id,
-            frame_index=input.frame_index,
-            object_id=input.object_id,
-            points=input.points,
-            labels=input.labels,
-            clear_old_points=input.clear_old_points,
+            session_id=body.sessionId,
+            frame_index=body.frameIndex,
+            object_id=body.objectId,
+            points=body.points,
+            labels=body.labels,
+            clear_old_points=body.clearOldPoints,
         )
-        reponse = inference_api.add_points(request)
-
+        
+        response = inference_api.add_points(request=request_obj)
+        
         return RLEMaskListOnFrame(
-            frame_index=reponse.frame_index,
-            rle_mask_list=[
+            frameIndex=response.frame_index,
+            rleMaskList=[
                 RLEMaskForObject(
-                    object_id=r.object_id,
-                    rle_mask=RLEMask(counts=r.mask.counts, size=r.mask.size, order="F"),
+                    objectId=r.object_id,
+                    rleMask=RLEMask(counts=r.mask.counts, size=r.mask.size, order="F"),
                 )
-                for r in reponse.results
+                for r in response.results
             ],
         )
 
-    @strawberry.mutation
-    def remove_object(
-        self, input: RemoveObjectInput, info: strawberry.Info
-    ) -> List[RLEMaskListOnFrame]:
-        inference_api: InferenceAPI = info.context["inference_api"]
-
-        request = RemoveObjectRequest(
-            type="remove_object", session_id=input.session_id, object_id=input.object_id
+    @rest_api.route("/api/remove_object", methods=["POST"])
+    @validate()
+    def remove_object(body: RemoveObjectInput):
+        request_obj = RemoveObjectRequest(
+            type="remove_object",
+            session_id=body.sessionId,
+            object_id=body.objectId,
         )
-
-        response = inference_api.remove_object(request)
+        
+        response = inference_api.remove_object(request=request_obj)
 
         return [
             RLEMaskListOnFrame(
-                frame_index=res.frame_index,
-                rle_mask_list=[
+                frameIndex=res.frame_index,
+                rleMaskList=[
                     RLEMaskForObject(
-                        object_id=r.object_id,
-                        rle_mask=RLEMask(
+                        objectId=r.object_id,
+                        rleMask=RLEMask(
                             counts=r.mask.counts, size=r.mask.size, order="F"
                         ),
                     )
@@ -203,58 +236,54 @@ class Mutation:
             for res in response.results
         ]
 
-    @strawberry.mutation
-    def clear_points_in_frame(
-        self, input: ClearPointsInFrameInput, info: strawberry.Info
-    ) -> RLEMaskListOnFrame:
-        inference_api: InferenceAPI = info.context["inference_api"]
-
-        request = ClearPointsInFrameRequest(
+    @rest_api.route("/api/clear_points_in_frame", methods=["POST"])
+    @validate()
+    def clear_points_in_frame(body: ClearPointsInFrameInput):
+        request_obj = ClearPointsInFrameRequest(
             type="clear_points_in_frame",
-            session_id=input.session_id,
-            frame_index=input.frame_index,
-            object_id=input.object_id,
+            session_id=body.sessionId,
+            frame_index=body.frameIndex,
+            object_id=body.objectId,
         )
 
-        response = inference_api.clear_points_in_frame(request)
+        response = inference_api.clear_points_in_frame(request=request_obj)
 
         return RLEMaskListOnFrame(
-            frame_index=response.frame_index,
-            rle_mask_list=[
+            frameIndex=response.frame_index,
+            rleMaskList=[
                 RLEMaskForObject(
-                    object_id=r.object_id,
-                    rle_mask=RLEMask(counts=r.mask.counts, size=r.mask.size, order="F"),
+                    objectId=r.object_id,
+                    rleMask=RLEMask(counts=r.mask.counts, size=r.mask.size, order="F"),
                 )
                 for r in response.results
             ],
         )
 
-    @strawberry.mutation
-    def clear_points_in_video(
-        self, input: ClearPointsInVideoInput, info: strawberry.Info
-    ) -> ClearPointsInVideo:
-        inference_api: InferenceAPI = info.context["inference_api"]
-
-        request = ClearPointsInVideoRequest(
+    @rest_api.route("/api/clear_points_in_video", methods=["POST"])
+    @validate()
+    def clear_points_in_video(body: ClearPointsInVideoInput):
+        request_obj = ClearPointsInVideoRequest(
             type="clear_points_in_video",
-            session_id=input.session_id,
+            session_id=body.sessionId,
         )
-        response = inference_api.clear_points_in_video(request)
+        
+        response = inference_api.clear_points_in_video(request=request_obj)
+        
         return ClearPointsInVideo(success=response.success)
 
-    @strawberry.mutation
-    def cancel_propagate_in_video(
-        self, input: CancelPropagateInVideoInput, info: strawberry.Info
-    ) -> CancelPropagateInVideo:
-        inference_api: InferenceAPI = info.context["inference_api"]
-
-        request = CancelPropagateInVideoRequest(
+    @rest_api.route("/api/cancel_propagate_in_video", methods=["POST"])
+    @validate()
+    def cancel_propagate_in_video(body: CancelPropagateInVideoInput):
+        request_obj = CancelPropagateInVideoRequest(
             type="cancel_propagate_in_video",
-            session_id=input.session_id,
+            session_id=body.sessionId,
         )
-        response = inference_api.cancel_propagate_in_video(request)
+        
+        response = inference_api.cancel_propagate_in_video(request=request_obj)
+        
         return CancelPropagateInVideo(success=response.success)
 
+    return rest_api
 
 def get_file_hash(video_path_or_file) -> str:
     if isinstance(video_path_or_file, str):
@@ -283,7 +312,7 @@ def _get_start_sec_duration_sec(
 
 
 def process_video(
-    file: Upload,
+    file: FileStorage,
     max_time: float,
     start_time_sec: Optional[float] = None,
     duration_time_sec: Optional[float] = None,
@@ -291,13 +320,12 @@ def process_video(
     """
     Process file upload including video trimming and content moderation checks.
 
-    Returns the filepath, s3_file_key, hash & video metaedata as a tuple.
+    Returns the filepath, s3_file_key, hash & video metadata as a tuple.
     """
     with tempfile.TemporaryDirectory() as tempdir:
         in_path = f"{tempdir}/in.mp4"
         out_path = f"{tempdir}/out.mp4"
-        with open(in_path, "wb") as in_f:
-            in_f.write(file.read())
+        file.save(in_path)
 
         try:
             video_metadata = get_video_metadata(in_path)
@@ -349,9 +377,3 @@ def process_video(
         shutil.move(out_path, filepath)
 
         return filepath, file_key, out_video_metadata
-
-
-schema = strawberry.Schema(
-    query=Query,
-    mutation=Mutation,
-)

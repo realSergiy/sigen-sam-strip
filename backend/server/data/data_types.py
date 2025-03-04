@@ -1,154 +1,115 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-
 from dataclasses import dataclass
 from typing import Iterable, List, Optional
 
-import strawberry
 from app_conf import API_URL
 from data.resolver import resolve_videos
-from dataclasses_json import dataclass_json
-from strawberry import relay
+from flask_openapi3 import FileStorage
 
+from pydantic import BaseModel
 
-@strawberry.type
-class Video(relay.Node):
+class Video(BaseModel):
     """Core type for video."""
 
-    code: relay.NodeID[str]
+    code: str
     path: str
     poster_path: Optional[str]
     width: int
     height: int
 
-    @strawberry.field
     def url(self) -> str:
         return f"{API_URL}/{self.path}"
 
-    @strawberry.field
     def poster_url(self) -> str:
         return f"{API_URL}/{self.poster_path}"
 
-    @classmethod
-    def resolve_nodes(
-        cls,
-        *,
-        info: relay.PageInfo,
-        node_ids: Iterable[str],
-        required: bool = False,
-    ):
-        return resolve_videos(node_ids, required)
+class VideoResponse(BaseModel):
+    """Standard video response format"""
+    id: str
+    height: int
+    width: int
+    url: str
+    path: str
+    posterPath: Optional[str] = None
+    posterUrl: Optional[str] = None
 
+class UploadVideoInput(BaseModel):
+    """Request model for video upload endpoint"""
+    file: FileStorage
+    startTimeSec: Optional[float] = None
+    durationTimeSec: Optional[float] = None
 
-@strawberry.type
-class RLEMask:
-    """Core type for Onevision GraphQL RLE mask."""
+class RLEMask(BaseModel):
+    """Core type for RLE mask."""
 
     size: List[int]
     counts: str
     order: str
 
-
-@strawberry.type
-class RLEMaskForObject:
+class RLEMaskForObject(BaseModel):
     """Type for RLE mask associated with a specific object id."""
 
-    object_id: int
-    rle_mask: RLEMask
+    objectId: int
+    rleMask: RLEMask
 
-
-@strawberry.type
-class RLEMaskListOnFrame:
+class RLEMaskListOnFrame(BaseModel):
     """Type for a list of object-associated RLE masks on a specific video frame."""
 
-    frame_index: int
-    rle_mask_list: List[RLEMaskForObject]
+    frameIndex: int
+    rleMaskList: List[RLEMaskForObject]
 
-
-@strawberry.input
-class StartSessionInput:
+class StartSessionInput(BaseModel):
     path: str
 
+class StartSession(BaseModel):
+    sessionId: str
 
-@strawberry.type
-class StartSession:
-    session_id: str
+class PingInput(BaseModel):
+    sessionId: str
 
-
-@strawberry.input
-class PingInput:
-    session_id: str
-
-
-@strawberry.type
-class Pong:
+class Pong(BaseModel):
     success: bool
 
+class CloseSessionInput(BaseModel):
+    sessionId: str
 
-@strawberry.input
-class CloseSessionInput:
-    session_id: str
-
-
-@strawberry.type
-class CloseSession:
+class CloseSession(BaseModel):
     success: bool
 
-
-@strawberry.input
-class AddPointsInput:
-    session_id: str
-    frame_index: int
-    clear_old_points: bool
-    object_id: int
+class AddPointsInput(BaseModel):
+    sessionId: str
+    frameIndex: int
+    clearOldPoints: bool
+    objectId: int
     labels: List[int]
     points: List[List[float]]
 
+class ClearPointsInFrameInput(BaseModel):
+    sessionId: str
+    frameIndex: int
+    objectId: int
 
-@strawberry.input
-class ClearPointsInFrameInput:
-    session_id: str
-    frame_index: int
-    object_id: int
+class ClearPointsInVideoInput(BaseModel):
+    sessionId: str
 
-
-@strawberry.input
-class ClearPointsInVideoInput:
-    session_id: str
-
-
-@strawberry.type
-class ClearPointsInVideo:
+class ClearPointsInVideo(BaseModel):
     success: bool
 
+class RemoveObjectInput(BaseModel):
+    sessionId: str
+    objectId: int
 
-@strawberry.input
-class RemoveObjectInput:
-    session_id: str
-    object_id: int
+class PropagateInVideoInput(BaseModel):
+    sessionId: str
+    startFrameIndex: int
 
+class CancelPropagateInVideoInput(BaseModel):
+    sessionId: str
 
-@strawberry.input
-class PropagateInVideoInput:
-    session_id: str
-    start_frame_index: int
-
-
-@strawberry.input
-class CancelPropagateInVideoInput:
-    session_id: str
-
-
-@strawberry.type
-class CancelPropagateInVideo:
+class CancelPropagateInVideo(BaseModel):
     success: bool
 
-
-@strawberry.type
-class SessionExpiration:
-    session_id: str
-    expiration_time: int
-    max_expiration_time: int
+class SessionExpiration(BaseModel):
+    sessionId: str
+    expirationTime: int
+    maxExpirationTime: int
     ttl: int
