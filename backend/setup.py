@@ -50,6 +50,7 @@ EXTRA_PACKAGES = {
         "gunicorn>=23.0.0",
         "imagesize>=1.4.1",
         "pycocotools>=2.0.8",
+        "requests>=2.32.3",
     ],
     "dev": [
         "black==24.2.0",

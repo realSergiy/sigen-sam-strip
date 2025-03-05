@@ -185,7 +185,9 @@ def load_video_frames(
     is_bytes = isinstance(video_path, bytes)
     is_str = isinstance(video_path, str)
     is_mp4_path = is_str and os.path.splitext(video_path)[-1] in [".mp4", ".MP4"]
-    if is_bytes or is_mp4_path:
+    is_url = is_str and (video_path.startswith("http://") or video_path.startswith("https://"))
+    
+    if is_bytes or is_mp4_path or is_url:
         return load_video_frames_from_video_file(
             video_path=video_path,
             image_size=image_size,
@@ -206,7 +208,7 @@ def load_video_frames(
         )
     else:
         raise NotImplementedError(
-            "Only MP4 video and JPEG folder are supported at this moment"
+            "Only MP4 video, video URLs, and JPEG folder are supported at this moment"
         )
 
 
@@ -285,28 +287,74 @@ def load_video_frames_from_video_file(
     img_std=(0.229, 0.224, 0.225),
     compute_device=torch.device("cuda"),
 ):
-    """Load the video frames from a video file."""
+    """Load the video frames from a video file or URL."""
     import decord
+    import tempfile
+    import requests
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    # Handle URL by downloading to a temporary file
+    is_url = isinstance(video_path, str) and (video_path.startswith("http://") or video_path.startswith("https://"))
+    temp_file = None
+    
+    try:
+        if is_url:
+            logger.info(f"Downloading video from URL: {video_path}")
+            temp_file = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+            response = requests.get(video_path, stream=True)
+            response.raise_for_status()  # Raise an exception for HTTP errors
+            
+            # Write the content to the temporary file
+            with open(temp_file.name, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+            
+            # Use the temporary file path instead of the URL
+            video_file_path = temp_file.name
+            logger.info(f"Video downloaded to temporary file: {video_file_path}")
+        else:
+            logger.info(f"Downloading video from path: {video_path}")
+            video_file_path = video_path
+        
+        img_mean = torch.tensor(img_mean, dtype=torch.float32)[:, None, None]
+        img_std = torch.tensor(img_std, dtype=torch.float32)[:, None, None]
+        
+        # Get the original video height and width
+        decord.bridge.set_bridge("torch")
+        video_reader = decord.VideoReader(video_file_path)
+        video_height, video_width, _ = video_reader.next().shape
+        
+        # Iterate over all frames in the video
+        images = []
+        for frame in decord.VideoReader(video_file_path, width=image_size, height=image_size):
+            images.append(frame.permute(2, 0, 1))
 
-    img_mean = torch.tensor(img_mean, dtype=torch.float32)[:, None, None]
-    img_std = torch.tensor(img_std, dtype=torch.float32)[:, None, None]
-    # Get the original video height and width
-    decord.bridge.set_bridge("torch")
-    video_height, video_width, _ = decord.VideoReader(video_path).next().shape
-    # Iterate over all frames in the video
-    images = []
-    for frame in decord.VideoReader(video_path, width=image_size, height=image_size):
-        images.append(frame.permute(2, 0, 1))
-
-    images = torch.stack(images, dim=0).float() / 255.0
-    if not offload_video_to_cpu:
-        images = images.to(compute_device)
-        img_mean = img_mean.to(compute_device)
-        img_std = img_std.to(compute_device)
-    # normalize by mean and std
-    images -= img_mean
-    images /= img_std
-    return images, video_height, video_width
+        images = torch.stack(images, dim=0).float() / 255.0        
+        if not offload_video_to_cpu:
+            logger.info(f"Offloading video to compute device: {compute_device}...")
+            images = images.to(compute_device)
+            img_mean = img_mean.to(compute_device)
+            img_std = img_std.to(compute_device)
+        # normalize by mean and std
+        images -= img_mean
+        images /= img_std
+        return images, video_height, video_width
+    
+    except Exception as e:
+        logger.error(f"Error loading video: {str(e)}")
+        raise
+    
+    finally:
+        # Clean up the temporary file if it was created
+        if temp_file is not None:
+            try:
+                os.unlink(temp_file.name)
+                logger.info(f"Temporary file removed: {temp_file.name}")
+            except Exception as e:
+                logger.warning(f"Failed to remove temporary file: {str(e)}")
 
 
 def fill_holes_in_mask_scores(mask, max_area):

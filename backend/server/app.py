@@ -90,10 +90,18 @@ def start_session(body: StartSessionInput):
     
     if not path:
         return {"error": "Path is required"}, 400
+    
+    # Check if the path is a URL (starts with http:// or https://)
+    if path.startswith("http://") or path.startswith("https://"):
+        # For URLs, pass the URL directly to the predictor
+        video_path = path
+    else:
+        # For local paths, prepend the DATA_PATH
+        video_path = f"{DATA_PATH}/{path}"
         
     request_obj = StartSessionRequest(
         type="start_session",
-        path=f"{DATA_PATH}/{path}",
+        path=video_path,
     )
     
     res = inference_api.start_session(request=request_obj)
@@ -209,7 +217,7 @@ def clear_points_in_video(body: ClearPointsInVideoInput):
     return ClearPointsInVideo(success=response.success)
 
 # TOOD: Protect route with ToS permission check
-@app.post("/propagate_in_video", summary="propagate mask in video", tags=[Tag(name="segmentation", description="video segmentation operations")])
+@app.post("/api/propagate_in_video", summary="propagate mask in video", tags=[Tag(name="segmentation", description="video segmentation operations")])
 def propagate_in_video(body: PropagateInVideoInput) -> Response:    
     args = {
         "session_id": body.sessionId,        
