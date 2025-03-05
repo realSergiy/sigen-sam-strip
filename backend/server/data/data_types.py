@@ -43,7 +43,7 @@ class RLEMask(BaseModel):
 
     size: List[int]
     counts: str
-    order: str
+    order: Optional[str] = None
 
 class RLEMaskForObject(BaseModel):
     """Type for RLE mask associated with a specific object id."""

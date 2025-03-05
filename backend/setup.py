@@ -1,20 +1,14 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
 import os
-
 from setuptools import find_packages, setup
 
 # Package metadata
 NAME = "SAM-2"
 VERSION = "1.0"
 DESCRIPTION = "SAM 2: Segment Anything in Images and Videos"
-URL = "https://github.com/facebookresearch/sam2"
-AUTHOR = "Meta AI"
-AUTHOR_EMAIL = "segment-anything@meta.com"
-LICENSE = "Apache 2.0"
+URL = "https://gallery.sigen.ai/"
+AUTHOR = "Sigen AI"
+# AUTHOR_EMAIL = "segment-anything@meta.com"
+# LICENSE = "Apache 2.0"
 
 # Read the contents of README file
 with open("LongDesc.md", "r", encoding="utf-8") as f:
@@ -51,6 +45,7 @@ EXTRA_PACKAGES = {
         "imagesize>=1.4.1",
         "pycocotools>=2.0.8",
         "requests>=2.32.3",
+        "dataclasses-json>=0.6.7",
     ],
     "dev": [
         "black==24.2.0",

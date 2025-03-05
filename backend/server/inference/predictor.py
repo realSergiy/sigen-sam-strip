@@ -62,6 +62,8 @@ class InferenceAPI:
             checkpoint = Path(APP_ROOT) / "checkpoints/sam2.1_hiera_base_plus.pt"
             model_cfg = "configs/sam2.1/sam2.1_hiera_b+.yaml"
 
+        logger.info(f"using model size {MODEL_SIZE}")
+
         # select the device for computation
         force_cpu_device = os.environ.get("SAM2_DEMO_FORCE_CPU_DEVICE", "0") == "1"
         if force_cpu_device:

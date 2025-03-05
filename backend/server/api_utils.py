@@ -5,6 +5,8 @@ import tempfile
 import av
 from werkzeug.datastructures import FileStorage
 from app_conf import UPLOADS_PATH, UPLOADS_PREFIX
+from data.data_types import RLEMask, RLEMaskForObject, RLEMaskListOnFrame
+from inference.data_types import PropagateDataResponse
 from data.transcoder import VideoMetadata, get_video_metadata, transcode
 from typing import Optional, Tuple, Union
 
@@ -100,3 +102,25 @@ def process_video(
         shutil.move(out_path, filepath)
 
         return filepath, file_key, out_video_metadata
+
+
+def create_rle_mask_list_on_frame(response: PropagateDataResponse) -> RLEMaskListOnFrame:
+    """
+    Helper function to create an RLEMaskListOnFrame from a PropagateDataResponse.
+
+    Args:
+        response: The response from the inference API containing frame_index and results.
+
+    Returns:
+        An RLEMaskListOnFrame object with the converted data.
+    """
+    return RLEMaskListOnFrame(
+        frameIndex=response.frame_index,
+        rleMaskList=[
+            RLEMaskForObject(
+                objectId=mfo.object_id,
+                rleMask=RLEMask(counts=mfo.mask.counts, size=mfo.mask.size, order="F"),
+            )
+            for mfo in response.results
+        ],
+    )

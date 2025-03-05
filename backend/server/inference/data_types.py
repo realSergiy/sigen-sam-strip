@@ -6,6 +6,7 @@
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Union
 
+from dataclasses_json import dataclass_json
 from torch import Tensor
 
 
@@ -91,13 +92,11 @@ class RemoveObjectRequest(BaseRequest):
     session_id: str
     object_id: int
 
-
 @dataclass
 class PropagateInVideoRequest(BaseRequest):
     type: str
     session_id: str
     start_frame_index: int
-
 
 @dataclass
 class CancelPropagateInVideoRequest(BaseRequest):
@@ -141,6 +140,7 @@ class PropagateDataValue:
     mask: Mask
 
 
+@dataclass_json
 @dataclass
 class PropagateDataResponse:
     frame_index: int
